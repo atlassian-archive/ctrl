@@ -214,8 +214,9 @@ func CancelOnInterrupt(ctx context.Context, f context.CancelFunc) {
 	}()
 }
 
-func NewFromFlags(controllers []ctrl.Constructor, flagset *flag.FlagSet, arguments []string) (*App, error) {
+func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.FlagSet, arguments []string) (*App, error) {
 	a := App{
+		Name:        name,
 		Controllers: controllers,
 	}
 	for _, cntrlr := range controllers {
@@ -249,7 +250,7 @@ func NewFromFlags(controllers []ctrl.Constructor, flagset *flag.FlagSet, argumen
 		"of a leadership. This is only applicable if leader election is enabled")
 	flagset.StringVar(&a.LeaderElectionConfig.ConfigMapNamespace, "leader-elect-configmap-namespace", meta_v1.NamespaceDefault,
 		"Namespace to use for leader election ConfigMap. This is only applicable if leader election is enabled")
-	flagset.StringVar(&a.LeaderElectionConfig.ConfigMapName, "leader-elect-configmap-name", a.Name+"-leader-elect",
+	flagset.StringVar(&a.LeaderElectionConfig.ConfigMapName, "leader-elect-configmap-name", name+"-leader-elect",
 		"ConfigMap name to use for leader election. This is only applicable if leader election is enabled")
 	configFileFrom := flagset.String("client-config-from", "in-cluster",
 		"Source of REST client configuration. 'in-cluster' (default), 'environment' and 'file' are valid options.")
@@ -269,7 +270,7 @@ func NewFromFlags(controllers []ctrl.Constructor, flagset *flag.FlagSet, argumen
 		return nil, err
 	}
 
-	config.UserAgent = a.Name
+	config.UserAgent = name
 	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(float32(*qps), int(*qps*1.5))
 	a.RestConfig = config
 
