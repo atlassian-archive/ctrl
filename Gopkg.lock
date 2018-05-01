@@ -359,7 +359,6 @@
   name = "k8s.io/client-go"
   packages = [
     "discovery",
-    "dynamic",
     "kubernetes",
     "kubernetes/scheme",
     "kubernetes/typed/admissionregistration/v1alpha1",
@@ -428,6 +427,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "fbfd22492f60af07520930245a54ad554a895ba3d95d475bfa6ca2fbc3f8add7"
+  inputs-digest = "2131b0dabbcf06800b50d95261a93a6cb2535b6372d7a5a4565b5b420767709f"
   solver-name = "gps-cdcl"
   solver-version = 1

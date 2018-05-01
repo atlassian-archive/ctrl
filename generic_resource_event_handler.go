@@ -20,7 +20,7 @@ type CreatorIndex interface {
 // The parent object is identified by a controller owner reference on the produced objects.
 type GenericResourceHandler struct {
 	Logger       *zap.Logger
-	Queue        WorkQueueProducer
+	WorkQueue    WorkQueueProducer
 	ZapNameField ZapNameField
 	CreatorIndex CreatorIndex
 	Gvk          schema.GroupVersionKind
@@ -85,7 +85,7 @@ func (g *GenericResourceHandler) rebuildByName(logger *zap.Logger, namespace, na
 	logger.
 		With(g.ZapNameField(name)).
 		Sugar().Infof("Rebuilding because controlled object was %s", g.Gvk.Kind, addUpdateDelete)
-	g.Queue.Add(QueueKey{
+	g.WorkQueue.Add(QueueKey{
 		Namespace: namespace,
 		Name:      name,
 	})
