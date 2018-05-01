@@ -63,14 +63,16 @@ func (g *GenericResourceHandler) OnDelete(obj interface{}) {
 	}
 	name, namespace := g.getControllerNameAndNamespace(metaObj)
 	if name == "" { // No controller object found
-		creators, err := g.CreatorIndex.CreatorByObject(
-			metaObj.(runtime.Object).GetObjectKind().GroupVersionKind().GroupKind(), namespace, metaObj.GetName())
-		if err != nil {
-			logger.Error("Failed to get creators for object", zap.Error(err))
-			return
-		}
-		for _, creator := range creators {
-			g.rebuildByName(logger, namespace, creator.(meta_v1.Object).GetName(), "deleted")
+		if g.CreatorIndex != nil {
+			creators, err := g.CreatorIndex.CreatorByObject(
+				metaObj.(runtime.Object).GetObjectKind().GroupVersionKind().GroupKind(), namespace, metaObj.GetName())
+			if err != nil {
+				logger.Error("Failed to get creators for object", zap.Error(err))
+				return
+			}
+			for _, creator := range creators {
+				g.rebuildByName(logger, namespace, creator.(meta_v1.Object).GetName(), "deleted")
+			}
 		}
 	} else {
 		g.rebuildByName(logger, namespace, name, "deleted")
