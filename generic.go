@@ -58,7 +58,7 @@ func NewGeneric(config *Config, logger *zap.Logger, queue workqueue.RateLimiting
 		}
 		inf.AddEventHandler(&GenericHandler{
 			Logger:       logger,
-			Queue:        queueGvk,
+			WorkQueue:    queueGvk,
 			ZapNameField: descr.ZapNameField,
 		})
 		controllers[descr.Gvk] = iface
