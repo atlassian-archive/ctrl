@@ -53,6 +53,7 @@ type QueueKey struct {
 }
 
 type Config struct {
+	AppName      string
 	Logger       *zap.Logger
 	Namespace    string
 	ResyncPeriod time.Duration

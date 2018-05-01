@@ -1,6 +1,7 @@
 package ctrl
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/atlassian/ctrl/logz"
@@ -35,9 +36,10 @@ func (g *Generic) processNextWorkItem() bool {
 	defer g.queue.done(key)
 
 	holder := g.Controllers[key.gvk]
-	logger := g.logger.With(logz.NamespaceName(key.Namespace), holder.ZapNameField(key.Name))
+	logger := g.logger.With(logz.NamespaceName(key.Namespace),
+		holder.ZapNameField(key.Name), logz.IterationName(atomic.AddUint32(&g.iter, 1)))
 
-	retriable, err := g.processKey(logger, holder.Cntrlr, key)
+	retriable, err := g.processKey(logger, holder, key)
 	g.handleErr(logger, retriable, err, key)
 
 	return true
@@ -58,7 +60,8 @@ func (g *Generic) handleErr(logger *zap.Logger, retriable bool, err error, key g
 	g.queue.forget(key)
 }
 
-func (g *Generic) processKey(logger *zap.Logger, cntrlr Interface, key gvkQueueKey) (bool /*retriable*/, error) {
+func (g *Generic) processKey(logger *zap.Logger, holder Holder, key gvkQueueKey) (bool /*retriable*/, error) {
+	cntrlr := holder.Cntrlr
 	informer := g.Informers[key.gvk]
 	obj, exists, err := getFromIndexer(informer.GetIndexer(), key.gvk, key.Namespace, key.Name)
 	if err != nil {
@@ -70,16 +73,23 @@ func (g *Generic) processKey(logger *zap.Logger, cntrlr Interface, key gvkQueueK
 	}
 	startTime := time.Now()
 	logger.Info("Started syncing")
+
+	msg := ""
+	defer func() {
+		totalTime := time.Since(startTime)
+		holder.objectProcessCount.Inc()
+		holder.objectProcessTime.Observe(totalTime.Seconds())
+		logger.Sugar().Infof("Synced in %v%s", totalTime, msg)
+	}()
+
 	retriable, err := cntrlr.Process(&ProcessContext{
 		Logger: logger,
 		Object: obj,
 	})
-	msg := ""
 	if err != nil && api_errors.IsConflict(errors.Cause(err)) {
 		msg = " (conflict)"
 		err = nil
 	}
-	logger.Sugar().Infof("Synced in %v%s", time.Since(startTime), msg)
 	return retriable, err
 }
 

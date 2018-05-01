@@ -2,10 +2,14 @@ package ctrl
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ash2k/stager"
+	"github.com/atlassian/ctrl/logz"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
@@ -19,6 +23,7 @@ const (
 )
 
 type Generic struct {
+	iter        uint32
 	logger      *zap.Logger
 	queue       workQueue
 	workers     int
@@ -26,7 +31,7 @@ type Generic struct {
 	Informers   map[schema.GroupVersionKind]cache.SharedIndexInformer
 }
 
-func NewGeneric(config *Config, logger *zap.Logger, queue workqueue.RateLimitingInterface, workers int, constructors ...Constructor) (*Generic, error) {
+func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers int, constructors ...Constructor) (*Generic, error) {
 	controllers := make(map[schema.GroupVersionKind]Interface, len(constructors))
 	holders := make(map[schema.GroupVersionKind]Holder, len(constructors))
 	informers := make(map[schema.GroupVersionKind]cache.SharedIndexInformer)
@@ -34,6 +39,7 @@ func NewGeneric(config *Config, logger *zap.Logger, queue workqueue.RateLimiting
 		queue: queue,
 		workDeduplicationPeriod: workDeduplicationPeriod,
 	}
+	replacer := strings.NewReplacer(".", "_", "-", "_", "/", "_")
 	for _, constr := range constructors {
 		descr := constr.Describe()
 		if _, ok := controllers[descr.Gvk]; ok {
@@ -41,14 +47,21 @@ func NewGeneric(config *Config, logger *zap.Logger, queue workqueue.RateLimiting
 		}
 		readyForWork := make(chan struct{})
 		queueGvk := wq.newQueueForGvk(descr.Gvk)
-		iface, err := constr.New(config, &Context{
-			ReadyForWork: func() {
-				close(readyForWork)
+		gvkLogger := config.Logger.With(logz.Gvk(descr.Gvk))
+		constructorConfig := config
+		constructorConfig.Logger = gvkLogger
+
+		iface, err := constr.New(
+			constructorConfig,
+			&Context{
+				ReadyForWork: func() {
+					close(readyForWork)
+				},
+				Informers:   informers,
+				Controllers: controllers,
+				WorkQueue:   queueGvk,
 			},
-			Informers:   informers,
-			Controllers: controllers,
-			WorkQueue:   queueGvk,
-		})
+		)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to construct controller for GVK %s", descr.Gvk)
 		}
@@ -57,19 +70,51 @@ func NewGeneric(config *Config, logger *zap.Logger, queue workqueue.RateLimiting
 			return nil, errors.Errorf("controller for GVK %s should have registered an informer for that GVK", descr.Gvk)
 		}
 		inf.AddEventHandler(&GenericHandler{
-			Logger:       logger,
+			Logger:       gvkLogger,
 			WorkQueue:    queueGvk,
 			ZapNameField: descr.ZapNameField,
 		})
 		controllers[descr.Gvk] = iface
+
+		// Extra controller data
+		groupKind := descr.Gvk.GroupKind()
+		objectName := replacer.Replace(groupKind.String())
+
+		objectProcessCount := prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Namespace: constructorConfig.AppName,
+				Name:      fmt.Sprintf("processed_%s_count", objectName),
+				Help:      fmt.Sprintf("Cumulative number of %s processed", &groupKind),
+			},
+		)
+
+		objectProcessTime := prometheus.NewHistogram(
+			prometheus.HistogramOpts{
+				Namespace: constructorConfig.AppName,
+				Name:      fmt.Sprintf("process_%s_seconds", objectName),
+				Help:      fmt.Sprintf("Histogram measuring the time it took to process a %s", &groupKind),
+			},
+		)
+		allMetrics := []prometheus.Collector{
+			objectProcessCount, objectProcessTime,
+		}
+		for _, metric := range allMetrics {
+			if err := constructorConfig.Registry.Register(metric); err != nil {
+				return nil, errors.WithStack(err)
+			}
+		}
+
 		holders[descr.Gvk] = Holder{
-			Cntrlr:       iface,
-			ZapNameField: descr.ZapNameField,
-			ReadyForWork: readyForWork,
+			Cntrlr:             iface,
+			ZapNameField:       descr.ZapNameField,
+			ReadyForWork:       readyForWork,
+			objectProcessCount: objectProcessCount,
+			objectProcessTime:  objectProcessTime,
 		}
 	}
+
 	return &Generic{
-		logger:      logger,
+		logger:      config.Logger,
 		queue:       wq,
 		workers:     workers,
 		Controllers: holders,
@@ -120,7 +165,9 @@ func (g *Generic) Run(ctx context.Context) {
 }
 
 type Holder struct {
-	Cntrlr       Interface
-	ZapNameField ZapNameField
-	ReadyForWork <-chan struct{}
+	Cntrlr             Interface
+	ZapNameField       ZapNameField
+	ReadyForWork       <-chan struct{}
+	objectProcessCount prometheus.Counter
+	objectProcessTime  prometheus.Histogram
 }

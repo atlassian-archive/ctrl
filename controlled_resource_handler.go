@@ -16,23 +16,23 @@ type CreatorIndex interface {
 	CreatorByObject(gk schema.GroupKind, namespace, name string) ([]runtime.Object, error)
 }
 
-// GenericResourceHandler is a handler for objects the are produced by some parent object.
+// ControlledResourceHandler is a handler for objects the are produced by some parent object.
 // The parent object is identified by a controller owner reference on the produced objects.
-type GenericResourceHandler struct {
-	Logger       *zap.Logger
-	WorkQueue    WorkQueueProducer
-	ZapNameField ZapNameField
-	CreatorIndex CreatorIndex
-	Gvk          schema.GroupVersionKind
+type ControlledResourceHandler struct {
+	Logger        *zap.Logger
+	WorkQueue     WorkQueueProducer
+	ZapNameField  ZapNameField
+	CreatorIndex  CreatorIndex
+	ControllerGvk schema.GroupVersionKind
 }
 
-func (g *GenericResourceHandler) OnAdd(obj interface{}) {
+func (g *ControlledResourceHandler) OnAdd(obj interface{}) {
 	name, namespace := g.getControllerNameAndNamespace(obj)
 	logger := g.loggerForObj(obj)
 	g.rebuildByName(logger, namespace, name, "added")
 }
 
-func (g *GenericResourceHandler) OnUpdate(oldObj, newObj interface{}) {
+func (g *ControlledResourceHandler) OnUpdate(oldObj, newObj interface{}) {
 	oldName, oldNamespace := g.getControllerNameAndNamespace(oldObj)
 
 	newName, newNamespace := g.getControllerNameAndNamespace(newObj)
@@ -45,7 +45,7 @@ func (g *GenericResourceHandler) OnUpdate(oldObj, newObj interface{}) {
 	g.rebuildByName(logger, newNamespace, newName, "updated")
 }
 
-func (g *GenericResourceHandler) OnDelete(obj interface{}) {
+func (g *ControlledResourceHandler) OnDelete(obj interface{}) {
 	logger := g.loggerForObj(obj)
 	metaObj, ok := obj.(meta_v1.Object)
 	if !ok {
@@ -80,13 +80,13 @@ func (g *GenericResourceHandler) OnDelete(obj interface{}) {
 }
 
 // This method may be called with an empty name.
-func (g *GenericResourceHandler) rebuildByName(logger *zap.Logger, namespace, name, addUpdateDelete string) {
+func (g *ControlledResourceHandler) rebuildByName(logger *zap.Logger, namespace, name, addUpdateDelete string) {
 	if name == "" {
 		return
 	}
 	logger.
 		With(g.ZapNameField(name)).
-		Sugar().Infof("Rebuilding because controlled object was %s", g.Gvk.Kind, addUpdateDelete)
+		Sugar().Infof("Rebuilding creator object %q because created object was %s", name, addUpdateDelete)
 	g.WorkQueue.Add(QueueKey{
 		Namespace: namespace,
 		Name:      name,
@@ -95,18 +95,18 @@ func (g *GenericResourceHandler) rebuildByName(logger *zap.Logger, namespace, na
 
 // getControllerNameAndNamespace returns name and namespace of the object's controller.
 // Returned name may be empty if the object does not have a controller owner reference.
-func (g *GenericResourceHandler) getControllerNameAndNamespace(obj interface{}) (string, string) {
+func (g *ControlledResourceHandler) getControllerNameAndNamespace(obj interface{}) (string, string) {
 	var name string
 	meta := obj.(meta_v1.Object)
 	ref := meta_v1.GetControllerOf(meta)
-	if ref != nil && ref.APIVersion == g.Gvk.GroupVersion().String() && ref.Kind == g.Gvk.Kind {
+	if ref != nil && ref.APIVersion == g.ControllerGvk.GroupVersion().String() && ref.Kind == g.ControllerGvk.Kind {
 		name = ref.Name
 	}
 	return name, meta.GetNamespace()
 }
 
-func (g *GenericResourceHandler) loggerForObj(obj interface{}) *zap.Logger {
-	logger := g.Logger.With(logz.Gvk(g.Gvk))
+func (g *ControlledResourceHandler) loggerForObj(obj interface{}) *zap.Logger {
+	logger := g.Logger
 	metaObj, ok := obj.(meta_v1.Object)
 	if ok { // This is conditional to deal with tombstones on delete event
 		logger = logger.With(logz.Namespace(metaObj), g.ZapNameField(metaObj.GetName()))

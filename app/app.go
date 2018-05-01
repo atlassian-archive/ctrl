@@ -46,9 +46,18 @@ type LeaderElectionConfig struct {
 	ConfigMapName      string
 }
 
+type PrometheusRegistry interface {
+	prometheus.Registerer
+	prometheus.Gatherer
+}
+
 type App struct {
-	Logger *zap.Logger
-	// Name is the name of the application.
+	Logger             *zap.Logger
+	MainClient         kubernetes.Interface
+	PrometheusRegistry PrometheusRegistry
+
+	// Name is the name of the application. It must only contain alphanumeric
+	// characters.
 	Name                 string
 	RestConfig           *rest.Config
 	ResyncPeriod         time.Duration
@@ -63,34 +72,17 @@ type App struct {
 func (a *App) Run(ctx context.Context) (retErr error) {
 	defer a.Logger.Sync()
 
-	// Clients
-	mainClient, err := kubernetes.NewForConfig(a.RestConfig)
-	if err != nil {
-		return err
-	}
-
-	// Metrics
-	registry := prometheus.NewPedanticRegistry()
-	err = registry.Register(prometheus.NewProcessCollector(os.Getpid(), ""))
-	if err != nil {
-		return err
-	}
-	err = registry.Register(prometheus.NewGoCollector())
-	if err != nil {
-		return err
-	}
-
 	// Controller
 	config := &ctrl.Config{
-		Logger:       a.Logger,
+		AppName:      a.Name,
 		Namespace:    a.Namespace,
 		ResyncPeriod: a.ResyncPeriod,
-		Registry:     registry,
+		Registry:     a.PrometheusRegistry,
 
 		RestConfig: a.RestConfig,
-		MainClient: mainClient,
+		MainClient: a.MainClient,
 	}
-	generic, err := ctrl.NewGeneric(config, a.Logger,
+	generic, err := ctrl.NewGeneric(config,
 		workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multiqueue"),
 		a.Workers, a.Controllers...)
 	if err != nil {
@@ -101,7 +93,7 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 	auxSrv := AuxServer{
 		Logger:   a.Logger,
 		Addr:     a.AuxListenOn,
-		Gatherer: registry,
+		Gatherer: a.PrometheusRegistry,
 		Debug:    a.Debug,
 	}
 
@@ -116,7 +108,7 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 	eventBroadcaster := record.NewBroadcaster()
 	loggingWatch := eventBroadcaster.StartLogging(a.Logger.Sugar().Infof)
 	defer loggingWatch.Stop()
-	recordingWatch := eventBroadcaster.StartRecordingToSink(&core_v1client.EventSinkImpl{Interface: mainClient.CoreV1().Events(meta_v1.NamespaceNone)})
+	recordingWatch := eventBroadcaster.StartRecordingToSink(&core_v1client.EventSinkImpl{Interface: a.MainClient.CoreV1().Events(meta_v1.NamespaceNone)})
 	defer recordingWatch.Stop()
 	recorder := eventBroadcaster.NewRecorder(eventsScheme, core_v1.EventSource{Component: a.Name})
 
@@ -144,7 +136,7 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 		a.Logger.Info("Starting leader election", logz.NamespaceName(a.LeaderElectionConfig.ConfigMapNamespace))
 
 		var startedLeading <-chan struct{}
-		ctx, startedLeading, err = a.startLeaderElection(ctx, mainClient.CoreV1(), recorder)
+		ctx, startedLeading, err = a.startLeaderElection(ctx, a.MainClient.CoreV1(), recorder)
 		if err != nil {
 			return err
 		}
@@ -275,6 +267,23 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 	a.RestConfig = config
 
 	a.Logger = logz.Logger(*loggingLevel, *logEncoding)
+
+	// Clients
+	a.MainClient, err = kubernetes.NewForConfig(a.RestConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	// Metrics
+	a.PrometheusRegistry = prometheus.NewPedanticRegistry()
+	err = a.PrometheusRegistry.Register(prometheus.NewProcessCollector(os.Getpid(), ""))
+	if err != nil {
+		return nil, err
+	}
+	err = a.PrometheusRegistry.Register(prometheus.NewGoCollector())
+	if err != nil {
+		return nil, err
+	}
 
 	return &a, nil
 }

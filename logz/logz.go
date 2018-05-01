@@ -32,6 +32,10 @@ func NamespaceName(namespace string) zapcore.Field {
 	return zap.String("namespace", namespace)
 }
 
+func IterationName(iteration uint32) zapcore.Field {
+	return zap.Uint32("iter", iteration)
+}
+
 func Logger(loggingLevel, logEncoding string) *zap.Logger {
 	var levelEnabler zapcore.Level
 	switch loggingLevel {
