@@ -15,22 +15,24 @@ type GenericHandler struct {
 func (g *GenericHandler) OnAdd(obj interface{}) {
 	metaObj := obj.(meta_v1.Object)
 	g.Logger.Info("Enqueuing object because it was added", logz.NamespaceName(metaObj.GetNamespace()), g.ZapNameField(metaObj.GetName()))
-	g.WorkQueue.Add(QueueKey{
-		Namespace: metaObj.GetNamespace(),
-		Name:      metaObj.GetName(),
-	})
+	g.add(metaObj)
 }
 
 func (g *GenericHandler) OnUpdate(oldObj, newObj interface{}) {
 	metaObj := newObj.(meta_v1.Object)
 	g.Logger.Info("Enqueuing object because it was updated", logz.NamespaceName(metaObj.GetNamespace()), g.ZapNameField(metaObj.GetName()))
-	g.WorkQueue.Add(QueueKey{
-		Namespace: metaObj.GetNamespace(),
-		Name:      metaObj.GetName(),
-	})
+	g.add(metaObj)
 }
 
 func (g *GenericHandler) OnDelete(obj interface{}) {
 	metaObj := obj.(meta_v1.Object)
 	g.Logger.Info("Object was deleted", logz.NamespaceName(metaObj.GetNamespace()), g.ZapNameField(metaObj.GetName()))
+	g.add(metaObj)
+}
+
+func (g *GenericHandler) add(obj meta_v1.Object) {
+	g.WorkQueue.Add(QueueKey{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	})
 }
