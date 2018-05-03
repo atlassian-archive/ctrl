@@ -78,6 +78,7 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 		Namespace:    a.Namespace,
 		ResyncPeriod: a.ResyncPeriod,
 		Registry:     a.PrometheusRegistry,
+		Logger:       a.Logger,
 
 		RestConfig: a.RestConfig,
 		MainClient: a.MainClient,
