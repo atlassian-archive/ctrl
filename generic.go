@@ -161,6 +161,8 @@ func (g *Generic) Run(ctx context.Context) {
 		stage.Start(g.worker)
 	}
 
+	// Start servers here
+
 	<-ctx.Done()
 }
 
