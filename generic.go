@@ -3,11 +3,13 @@ package ctrl
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/ash2k/stager"
 	"github.com/atlassian/ctrl/logz"
+	chimw "github.com/go-chi/chi/middleware"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -28,13 +30,15 @@ type Generic struct {
 	queue       workQueue
 	workers     int
 	Controllers map[schema.GroupVersionKind]Holder
+	Servers     map[schema.GroupVersionKind]ServerHolder
 	Informers   map[schema.GroupVersionKind]cache.SharedIndexInformer
 }
 
 func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers int, constructors ...Constructor) (*Generic, error) {
 	controllers := make(map[schema.GroupVersionKind]Interface, len(constructors))
-	holders := make(map[schema.GroupVersionKind]Holder, len(constructors))
+	holders := make(map[schema.GroupVersionKind]Holder)
 	informers := make(map[schema.GroupVersionKind]cache.SharedIndexInformer)
+	servers := make(map[schema.GroupVersionKind]ServerHolder)
 	wq := workQueue{
 		queue: queue,
 		workDeduplicationPeriod: workDeduplicationPeriod,
@@ -50,31 +54,6 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 		gvkLogger := config.Logger.With(logz.Gvk(descr.Gvk))
 		constructorConfig := config
 		constructorConfig.Logger = gvkLogger
-
-		iface, err := constr.New(
-			constructorConfig,
-			&Context{
-				ReadyForWork: func() {
-					close(readyForWork)
-				},
-				Informers:   informers,
-				Controllers: controllers,
-				WorkQueue:   queueGvk,
-			},
-		)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to construct controller for GVK %s", descr.Gvk)
-		}
-		inf, ok := informers[descr.Gvk]
-		if !ok {
-			return nil, errors.Errorf("controller for GVK %s should have registered an informer for that GVK", descr.Gvk)
-		}
-		inf.AddEventHandler(&GenericHandler{
-			Logger:       gvkLogger,
-			WorkQueue:    queueGvk,
-			ZapNameField: descr.ZapNameField,
-		})
-		controllers[descr.Gvk] = iface
 
 		// Extra controller data
 		groupKind := descr.Gvk.GroupKind()
@@ -95,8 +74,24 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 				Help:      fmt.Sprintf("Histogram measuring the time it took to process a %s", &groupKind),
 			},
 		)
+		// Extra api data
+		requestCount := prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: fmt.Sprintf("processed_%s_count", objectName),
+				Help: fmt.Sprintf("Cumulative number of %s processed", &groupKind),
+			},
+			[]string{"url", "method", "status"},
+		)
+		requestTime := prometheus.NewHistogram(
+			prometheus.HistogramOpts{
+				Name: fmt.Sprintf("processed_%s_time", objectName),
+				Help: fmt.Sprintf("Number of seconds each request to %s takes", &groupKind),
+			},
+		)
+
 		allMetrics := []prometheus.Collector{
 			objectProcessCount, objectProcessTime,
+			requestCount, requestTime,
 		}
 		for _, metric := range allMetrics {
 			if err := constructorConfig.Registry.Register(metric); err != nil {
@@ -104,12 +99,50 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 			}
 		}
 
-		holders[descr.Gvk] = Holder{
-			Cntrlr:             iface,
-			ZapNameField:       descr.ZapNameField,
-			ReadyForWork:       readyForWork,
-			objectProcessCount: objectProcessCount,
-			objectProcessTime:  objectProcessTime,
+		constructed, err := constr.New(
+			constructorConfig,
+			&Context{
+				ReadyForWork: func() {
+					close(readyForWork)
+				},
+				Middleware:  addMiddleware(requestCount, requestTime),
+				Informers:   informers,
+				Controllers: controllers,
+				WorkQueue:   queueGvk,
+			},
+		)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to construct controller for GVK %s", descr.Gvk)
+		}
+
+		inf, ok := informers[descr.Gvk]
+		if ok {
+			inf.AddEventHandler(&GenericHandler{
+				Logger:       gvkLogger,
+				WorkQueue:    queueGvk,
+				ZapNameField: descr.ZapNameField,
+			})
+		}
+
+		if constructed.Interface != nil {
+			controllers[descr.Gvk] = constructed.Interface
+
+			holders[descr.Gvk] = Holder{
+				Cntrlr:             constructed.Interface,
+				ZapNameField:       descr.ZapNameField,
+				ReadyForWork:       readyForWork,
+				objectProcessCount: objectProcessCount,
+				objectProcessTime:  objectProcessTime,
+			}
+		}
+
+		if constructed.Server != nil {
+			servers[descr.Gvk] = ServerHolder{
+				Server:       constructed.Server,
+				ZapNameField: descr.ZapNameField,
+				requestCount: requestCount,
+				requestTime:  requestTime,
+			}
 		}
 	}
 
@@ -118,6 +151,7 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 		queue:       wq,
 		workers:     workers,
 		Controllers: holders,
+		Servers:     servers,
 		Informers:   informers,
 	}, nil
 }
@@ -161,9 +195,34 @@ func (g *Generic) Run(ctx context.Context) {
 		stage.Start(g.worker)
 	}
 
-	// Start servers here
+	// Stage: start servers
+	stage = stgr.NextStage()
+	ctx, cancel := context.WithCancel(ctx)
+
+	for _, srv := range g.Servers {
+		stage.StartWithContext(func(metricsCtx context.Context) {
+			defer cancel() // if srv fails to start it signals the whole program that it should shut down
+			err := srv.Server.Run(metricsCtx)
+			g.logger.Sugar().Errorf("Server errored out with %s", err)
+		})
+	}
 
 	<-ctx.Done()
+}
+
+func addMiddleware(requestCount *prometheus.CounterVec, requestTime prometheus.Histogram) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			res := chimw.NewWrapResponseWriter(w, r.ProtoMajor)
+			t0 := time.Now()
+			next.ServeHTTP(w, r)
+			t1 := time.Now()
+			tn := t1.Sub(t0)
+
+			requestCount.WithLabelValues(r.URL.Path, r.Method, string(res.Status())).Inc()
+			requestTime.Observe(tn.Seconds())
+		})
+	}
 }
 
 type Holder struct {
@@ -172,4 +231,12 @@ type Holder struct {
 	ReadyForWork       <-chan struct{}
 	objectProcessCount prometheus.Counter
 	objectProcessTime  prometheus.Histogram
+}
+
+type ServerHolder struct {
+	Server       Server
+	ZapNameField ZapNameField
+	ReadyForWork <-chan struct{}
+	requestCount *prometheus.CounterVec
+	requestTime  prometheus.Histogram
 }

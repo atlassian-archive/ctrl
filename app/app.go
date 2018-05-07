@@ -63,7 +63,6 @@ type App struct {
 	ResyncPeriod         time.Duration
 	Namespace            string
 	Controllers          []ctrl.Constructor
-	Servers              []ctrl.ServerConstructor
 	Workers              int
 	LeaderElectionConfig LeaderElectionConfig
 	AuxListenOn          string
@@ -90,8 +89,6 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 	if err != nil {
 		return err
 	}
-
-	// Construct servers
 
 	// Auxiliary server
 	auxSrv := AuxServer{
