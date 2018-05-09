@@ -3,9 +3,8 @@ package ctrl
 import (
 	"context"
 	"flag"
-	"time"
-
 	"net/http"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"

@@ -148,7 +148,11 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 		}
 	}
 
-	generic.Run(ctx)
+	err := generic.Run(ctx)
+	if err != nil {
+		return err
+	}
+
 	return ctx.Err()
 }
 

@@ -36,9 +36,10 @@ type Generic struct {
 
 func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers int, constructors ...Constructor) (*Generic, error) {
 	controllers := make(map[schema.GroupVersionKind]Interface, len(constructors))
+	servers := make(map[schema.GroupVersionKind]Server, len(constructors))
 	holders := make(map[schema.GroupVersionKind]Holder)
 	informers := make(map[schema.GroupVersionKind]cache.SharedIndexInformer)
-	servers := make(map[schema.GroupVersionKind]ServerHolder)
+	serverHolders := make(map[schema.GroupVersionKind]ServerHolder)
 	wq := workQueue{
 		queue: queue,
 		workDeduplicationPeriod: workDeduplicationPeriod,
@@ -49,6 +50,11 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 		if _, ok := controllers[descr.Gvk]; ok {
 			return nil, errors.Errorf("duplicate controller for GVK %s", descr.Gvk)
 		}
+
+		if _, ok := servers[descr.Gvk]; ok {
+			return nil, errors.Errorf("duplicate server for GVK %s", descr.Gvk)
+		}
+
 		readyForWork := make(chan struct{})
 		queueGvk := wq.newQueueForGvk(descr.Gvk)
 		gvkLogger := config.Logger.With(logz.Gvk(descr.Gvk))
@@ -59,45 +65,22 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 		groupKind := descr.Gvk.GroupKind()
 		objectName := replacer.Replace(groupKind.String())
 
-		objectProcessCount := prometheus.NewCounter(
-			prometheus.CounterOpts{
-				Namespace: constructorConfig.AppName,
-				Name:      fmt.Sprintf("processed_%s_count", objectName),
-				Help:      fmt.Sprintf("Cumulative number of %s processed", &groupKind),
-			},
-		)
-
-		objectProcessTime := prometheus.NewHistogram(
-			prometheus.HistogramOpts{
-				Namespace: constructorConfig.AppName,
-				Name:      fmt.Sprintf("process_%s_seconds", objectName),
-				Help:      fmt.Sprintf("Histogram measuring the time it took to process a %s", &groupKind),
-			},
-		)
 		// Extra api data
 		requestCount := prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Name: fmt.Sprintf("processed_%s_count", objectName),
+				Name: fmt.Sprintf("request_%s_count", objectName),
 				Help: fmt.Sprintf("Cumulative number of %s processed", &groupKind),
 			},
 			[]string{"url", "method", "status"},
 		)
 		requestTime := prometheus.NewHistogram(
 			prometheus.HistogramOpts{
-				Name: fmt.Sprintf("processed_%s_time", objectName),
+				Name: fmt.Sprintf("request_%s_time", objectName),
 				Help: fmt.Sprintf("Number of seconds each request to %s takes", &groupKind),
 			},
 		)
 
-		allMetrics := []prometheus.Collector{
-			objectProcessCount, objectProcessTime,
-			requestCount, requestTime,
-		}
-		for _, metric := range allMetrics {
-			if err := constructorConfig.Registry.Register(metric); err != nil {
-				return nil, errors.WithStack(err)
-			}
-		}
+		allMetrics := []prometheus.Collector{}
 
 		constructed, err := constr.New(
 			constructorConfig,
@@ -115,17 +98,38 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 			return nil, errors.Wrapf(err, "failed to construct controller for GVK %s", descr.Gvk)
 		}
 
-		inf, ok := informers[descr.Gvk]
-		if ok {
+		if constructed.Interface == nil && constructed.Server == nil {
+			return nil, errors.Wrapf(err, "failed to construct controler or server for GVK %s", descr.Gvk)
+		}
+
+		if constructed.Interface != nil {
+			inf, ok := informers[descr.Gvk]
+			if !ok {
+				return nil, errors.Errorf("controller for GVK %s should have registered an informer for that GVK", descr.Gvk)
+			}
 			inf.AddEventHandler(&GenericHandler{
 				Logger:       gvkLogger,
 				WorkQueue:    queueGvk,
 				ZapNameField: descr.ZapNameField,
 			})
-		}
 
-		if constructed.Interface != nil {
 			controllers[descr.Gvk] = constructed.Interface
+
+			objectProcessCount := prometheus.NewCounter(
+				prometheus.CounterOpts{
+					Namespace: constructorConfig.AppName,
+					Name:      fmt.Sprintf("processed_%s_count", objectName),
+					Help:      fmt.Sprintf("Cumulative number of %s processed", &groupKind),
+				},
+			)
+
+			objectProcessTime := prometheus.NewHistogram(
+				prometheus.HistogramOpts{
+					Namespace: constructorConfig.AppName,
+					Name:      fmt.Sprintf("process_%s_seconds", objectName),
+					Help:      fmt.Sprintf("Histogram measuring the time it took to process a %s", &groupKind),
+				},
+			)
 
 			holders[descr.Gvk] = Holder{
 				Cntrlr:             constructed.Interface,
@@ -134,14 +138,27 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 				objectProcessCount: objectProcessCount,
 				objectProcessTime:  objectProcessTime,
 			}
+
+			allMetrics = append(allMetrics, objectProcessCount, objectProcessTime)
 		}
 
 		if constructed.Server != nil {
-			servers[descr.Gvk] = ServerHolder{
+			servers[descr.Gvk] = constructed.Server
+
+			serverHolders[descr.Gvk] = ServerHolder{
 				Server:       constructed.Server,
 				ZapNameField: descr.ZapNameField,
 				requestCount: requestCount,
 				requestTime:  requestTime,
+			}
+
+			allMetrics = append(allMetrics, requestCount, requestTime)
+
+		}
+
+		for _, metric := range allMetrics {
+			if err := constructorConfig.Registry.Register(metric); err != nil {
+				return nil, errors.WithStack(err)
 			}
 		}
 	}
@@ -151,12 +168,12 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 		queue:       wq,
 		workers:     workers,
 		Controllers: holders,
-		Servers:     servers,
+		Servers:     serverHolders,
 		Informers:   informers,
 	}, nil
 }
 
-func (g *Generic) Run(ctx context.Context) {
+func (g *Generic) Run(ctx context.Context) error {
 	// Stager will perform ordered, graceful shutdown
 	stgr := stager.New()
 	defer stgr.Shutdown()
@@ -170,7 +187,7 @@ func (g *Generic) Run(ctx context.Context) {
 	g.logger.Info("Waiting for informers to sync")
 	for _, inf := range g.Informers {
 		if !cache.WaitForCacheSync(ctx.Done(), inf.HasSynced) {
-			return
+			return nil
 		}
 	}
 	g.logger.Info("Informers synced")
@@ -184,7 +201,7 @@ func (g *Generic) Run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			g.logger.Sugar().Infof("Was waiting for the controller for %s to become ready for processing", gvk)
-			return
+			return nil
 		case <-c.ReadyForWork:
 		}
 	}
@@ -199,15 +216,21 @@ func (g *Generic) Run(ctx context.Context) {
 	stage = stgr.NextStage()
 	ctx, cancel := context.WithCancel(ctx)
 
+	var srvErr error
+
 	for _, srv := range g.Servers {
 		stage.StartWithContext(func(metricsCtx context.Context) {
 			defer cancel() // if srv fails to start it signals the whole program that it should shut down
 			err := srv.Server.Run(metricsCtx)
-			g.logger.Sugar().Errorf("Server errored out with %s", err)
+			if err != nil {
+				g.logger.Sugar().Errorf("Server errored out with %s", err)
+				srvErr = err
+			}
 		})
 	}
 
 	<-ctx.Done()
+	return srvErr
 }
 
 func addMiddleware(requestCount *prometheus.CounterVec, requestTime prometheus.Histogram) func(http.Handler) http.Handler {
@@ -215,9 +238,8 @@ func addMiddleware(requestCount *prometheus.CounterVec, requestTime prometheus.H
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			res := chimw.NewWrapResponseWriter(w, r.ProtoMajor)
 			t0 := time.Now()
-			next.ServeHTTP(w, r)
-			t1 := time.Now()
-			tn := t1.Sub(t0)
+			next.ServeHTTP(res, r)
+			tn := time.Since(t0)
 
 			requestCount.WithLabelValues(r.URL.Path, r.Method, string(res.Status())).Inc()
 			requestTime.Observe(tn.Seconds())
