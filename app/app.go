@@ -147,13 +147,7 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 		case <-startedLeading:
 		}
 	}
-
-	err := generic.Run(ctx)
-	if err != nil {
-		return err
-	}
-
-	return ctx.Err()
+	return generic.Run(ctx)
 }
 
 func (a *App) startLeaderElection(ctx context.Context, configMapsGetter core_v1client.ConfigMapsGetter, recorder record.EventRecorder) (context.Context, <-chan struct{}, error) {

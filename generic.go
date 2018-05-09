@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -47,13 +48,6 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 	replacer := strings.NewReplacer(".", "_", "-", "_", "/", "_")
 	for _, constr := range constructors {
 		descr := constr.Describe()
-		if _, ok := controllers[descr.Gvk]; ok {
-			return nil, errors.Errorf("duplicate controller for GVK %s", descr.Gvk)
-		}
-
-		if _, ok := servers[descr.Gvk]; ok {
-			return nil, errors.Errorf("duplicate server for GVK %s", descr.Gvk)
-		}
 
 		readyForWork := make(chan struct{})
 		queueGvk := wq.newQueueForGvk(descr.Gvk)
@@ -80,7 +74,7 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 			},
 		)
 
-		allMetrics := []prometheus.Collector{}
+		var allMetrics []prometheus.Collector
 
 		constructed, err := constr.New(
 			constructorConfig,
@@ -99,10 +93,13 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 		}
 
 		if constructed.Interface == nil && constructed.Server == nil {
-			return nil, errors.Wrapf(err, "failed to construct controler or server for GVK %s", descr.Gvk)
+			return nil, errors.Wrapf(err, "failed to construct controller or server for GVK %s", descr.Gvk)
 		}
 
 		if constructed.Interface != nil {
+			if _, ok := controllers[descr.Gvk]; ok {
+				return nil, errors.Errorf("duplicate controller for GVK %s", descr.Gvk)
+			}
 			inf, ok := informers[descr.Gvk]
 			if !ok {
 				return nil, errors.Errorf("controller for GVK %s should have registered an informer for that GVK", descr.Gvk)
@@ -143,6 +140,9 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 		}
 
 		if constructed.Server != nil {
+			if _, ok := servers[descr.Gvk]; ok {
+				return nil, errors.Errorf("duplicate server for GVK %s", descr.Gvk)
+			}
 			servers[descr.Gvk] = constructed.Server
 
 			serverHolders[descr.Gvk] = ServerHolder{
@@ -153,7 +153,6 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 			}
 
 			allMetrics = append(allMetrics, requestCount, requestTime)
-
 		}
 
 		for _, metric := range allMetrics {
@@ -187,7 +186,7 @@ func (g *Generic) Run(ctx context.Context) error {
 	g.logger.Info("Waiting for informers to sync")
 	for _, inf := range g.Informers {
 		if !cache.WaitForCacheSync(ctx.Done(), inf.HasSynced) {
-			return nil
+			return ctx.Err()
 		}
 	}
 	g.logger.Info("Informers synced")
@@ -201,7 +200,7 @@ func (g *Generic) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			g.logger.Sugar().Infof("Was waiting for the controller for %s to become ready for processing", gvk)
-			return nil
+			return ctx.Err()
 		case <-c.ReadyForWork:
 		}
 	}
@@ -213,24 +212,14 @@ func (g *Generic) Run(ctx context.Context) error {
 	}
 
 	// Stage: start servers
-	stage = stgr.NextStage()
-	ctx, cancel := context.WithCancel(ctx)
-
-	var srvErr error
-
+	group, ctx := errgroup.WithContext(ctx)
 	for _, srv := range g.Servers {
-		stage.StartWithContext(func(metricsCtx context.Context) {
-			defer cancel() // if srv fails to start it signals the whole program that it should shut down
-			err := srv.Server.Run(metricsCtx)
-			if err != nil {
-				g.logger.Sugar().Errorf("Server errored out with %s", err)
-				srvErr = err
-			}
+		server := srv.Server // capture field into a scoped variable to avoid data race
+		group.Go(func() error {
+			return server.Run(ctx)
 		})
 	}
-
-	<-ctx.Done()
-	return srvErr
+	return group.Wait()
 }
 
 func addMiddleware(requestCount *prometheus.CounterVec, requestTime prometheus.Histogram) func(http.Handler) http.Handler {
