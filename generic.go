@@ -36,8 +36,8 @@ type Generic struct {
 }
 
 func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers int, constructors ...Constructor) (*Generic, error) {
-	controllers := make(map[schema.GroupVersionKind]Interface, len(constructors))
-	servers := make(map[schema.GroupVersionKind]Server, len(constructors))
+	controllers := make(map[schema.GroupVersionKind]Interface)
+	servers := make(map[schema.GroupVersionKind]Server)
 	holders := make(map[schema.GroupVersionKind]Holder)
 	informers := make(map[schema.GroupVersionKind]cache.SharedIndexInformer)
 	serverHolders := make(map[schema.GroupVersionKind]ServerHolder)
