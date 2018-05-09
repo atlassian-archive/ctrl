@@ -211,6 +211,11 @@ func (g *Generic) Run(ctx context.Context) error {
 		stage.Start(g.worker)
 	}
 
+	if len(g.Servers) == 0 {
+		<-ctx.Done()
+		return ctx.Err()
+	}
+
 	// Stage: start servers
 	group, ctx := errgroup.WithContext(ctx)
 	for _, srv := range g.Servers {
