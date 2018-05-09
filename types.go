@@ -3,6 +3,7 @@ package ctrl
 import (
 	"context"
 	"flag"
+	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
@@ -24,11 +25,23 @@ type Descriptor struct {
 	ZapNameField ZapNameField
 }
 
+type Server interface {
+	Run(context.Context) error
+}
+
+type Constructed struct {
+	// Interface holds an optional controller interface.
+	Interface Interface
+	// Server holds an optional server interface.
+	Server Server
+}
+
 type Constructor interface {
 	AddFlags(*flag.FlagSet)
-	// New constructs a new controller.
-	// It must register an informer for the GVK controller handles via Context.RegisterInformer().
-	New(*Config, *Context) (Interface, error)
+	// New constructs a new controller and/or server.
+	// If it constructs a controller, it must register an informer for the GVK controller
+	// handles via Context.RegisterInformer().
+	New(*Config, *Context) (*Constructed, error)
 	Describe() Descriptor
 }
 
@@ -68,6 +81,8 @@ type Context struct {
 	// process work using it's Process() method. This should be used to delay processing while some initialization
 	// is being performed.
 	ReadyForWork func()
+	// Middleware is the standard middleware that is supposed to be used to wrap the http handler of the server.
+	Middleware func(http.Handler) http.Handler
 	// Will contain all informers once Generic controller constructs all controllers.
 	// This is a read only field, must not be modified.
 	Informers map[schema.GroupVersionKind]cache.SharedIndexInformer
