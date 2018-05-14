@@ -115,7 +115,7 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 			objectProcessTime := prometheus.NewHistogram(
 				prometheus.HistogramOpts{
 					Namespace: constructorConfig.AppName,
-					Name:      fmt.Sprintf("process_%s", objectName),
+					Name:      fmt.Sprintf("process_%s_seconds", objectName),
 					Help:      fmt.Sprintf("Histogram measuring the time it took to process a %s", &groupKind),
 				},
 			)
