@@ -77,7 +77,6 @@ func (g *Generic) processKey(logger *zap.Logger, holder Holder, key gvkQueueKey)
 	msg := ""
 	defer func() {
 		totalTime := time.Since(startTime)
-		holder.objectProcessCount.Inc()
 		holder.objectProcessTime.Observe(totalTime.Seconds())
 		logger.Sugar().Infof("Synced in %v%s", totalTime, msg)
 	}()
