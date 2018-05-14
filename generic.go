@@ -112,31 +112,22 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 
 			controllers[descr.Gvk] = constructed.Interface
 
-			objectProcessCount := prometheus.NewCounter(
-				prometheus.CounterOpts{
-					Namespace: constructorConfig.AppName,
-					Name:      fmt.Sprintf("processed_%s_count", objectName),
-					Help:      fmt.Sprintf("Cumulative number of %s processed", &groupKind),
-				},
-			)
-
 			objectProcessTime := prometheus.NewHistogram(
 				prometheus.HistogramOpts{
 					Namespace: constructorConfig.AppName,
-					Name:      fmt.Sprintf("process_%s_seconds", objectName),
+					Name:      fmt.Sprintf("process_%s", objectName),
 					Help:      fmt.Sprintf("Histogram measuring the time it took to process a %s", &groupKind),
 				},
 			)
 
 			holders[descr.Gvk] = Holder{
-				Cntrlr:             constructed.Interface,
-				ZapNameField:       descr.ZapNameField,
-				ReadyForWork:       readyForWork,
-				objectProcessCount: objectProcessCount,
-				objectProcessTime:  objectProcessTime,
+				Cntrlr:            constructed.Interface,
+				ZapNameField:      descr.ZapNameField,
+				ReadyForWork:      readyForWork,
+				objectProcessTime: objectProcessTime,
 			}
 
-			allMetrics = append(allMetrics, objectProcessCount, objectProcessTime)
+			allMetrics = append(allMetrics, objectProcessTime)
 		}
 
 		if constructed.Server != nil {
@@ -242,11 +233,10 @@ func addMiddleware(requestCount *prometheus.CounterVec, requestTime prometheus.H
 }
 
 type Holder struct {
-	Cntrlr             Interface
-	ZapNameField       ZapNameField
-	ReadyForWork       <-chan struct{}
-	objectProcessCount prometheus.Counter
-	objectProcessTime  prometheus.Histogram
+	Cntrlr            Interface
+	ZapNameField      ZapNameField
+	ReadyForWork      <-chan struct{}
+	objectProcessTime prometheus.Histogram
 }
 
 type ServerHolder struct {
