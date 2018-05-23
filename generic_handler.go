@@ -7,6 +7,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+// This handler assumes that the Logger already has the obj_gk/ctrl_gk field set.
 type GenericHandler struct {
 	Logger       *zap.Logger
 	WorkQueue    WorkQueueProducer
@@ -14,49 +15,38 @@ type GenericHandler struct {
 }
 
 func (g *GenericHandler) OnAdd(obj interface{}) {
-	logger := g.loggerForObj(obj)
-	metaObj := obj.(meta_v1.Object)
-	logger.Info("Enqueuing object because it was added")
-	g.add(metaObj)
+	g.add(obj.(meta_v1.Object), "added")
 }
 
 func (g *GenericHandler) OnUpdate(oldObj, newObj interface{}) {
-	logger := g.loggerForObj(newObj)
-	metaObj := newObj.(meta_v1.Object)
-	logger.Info("Enqueuing object because it was updated")
-	g.add(metaObj)
+	g.add(newObj.(meta_v1.Object), "updated")
 }
 
 func (g *GenericHandler) OnDelete(obj interface{}) {
-	logger := g.loggerForObj(obj)
 	metaObj, ok := obj.(meta_v1.Object)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			logger.Sugar().Errorf("Delete event with unrecognized object type: %T", obj)
+			g.Logger.Sugar().Errorf("Delete event with unrecognized object type: %T", obj)
 			return
 		}
 		metaObj, ok = tombstone.Obj.(meta_v1.Object)
 		if !ok {
-			logger.Sugar().Errorf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
+			g.Logger.Sugar().Errorf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
 			return
 		}
 	}
-	g.add(metaObj)
+	g.add(metaObj, "deleted")
 }
 
-func (g *GenericHandler) add(obj meta_v1.Object) {
+func (g *GenericHandler) add(obj meta_v1.Object, addUpdateDelete string) {
+	g.loggerForObj(obj).Sugar().Infof("Enqueuing object because it was %s", addUpdateDelete)
 	g.WorkQueue.Add(QueueKey{
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	})
 }
 
-func (g *GenericHandler) loggerForObj(obj interface{}) *zap.Logger {
-	logger := g.Logger
-	metaObj, ok := obj.(meta_v1.Object)
-	if ok { // This is conditional to deal with tombstones on delete event
-		logger = logger.With(logz.Namespace(metaObj), g.ZapNameField(metaObj.GetName()))
-	}
-	return logger
+func (g *GenericHandler) loggerForObj(obj meta_v1.Object) *zap.Logger {
+	return g.Logger.With(logz.Namespace(obj), g.ZapNameField(obj.GetName()))
 }

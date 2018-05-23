@@ -37,7 +37,7 @@ func (g *Generic) processNextWorkItem() bool {
 
 	holder := g.Controllers[key.gvk]
 	logger := g.logger.With(logz.NamespaceName(key.Namespace),
-		holder.ZapNameField(key.Name), logz.IterationName(atomic.AddUint32(&g.iter, 1)))
+		logz.ControllerName(key.Name), logz.IterationName(atomic.AddUint32(&g.iter, 1)))
 
 	retriable, err := g.processKey(logger, holder, key)
 	g.handleErr(logger, retriable, err, key)
