@@ -265,7 +265,7 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(float32(*qps), int(*qps*1.5))
 	a.RestConfig = config
 
-	a.Logger = logz.Logger(*loggingLevel, *logEncoding)
+	a.Logger = logz.LoggerStr(*loggingLevel, *logEncoding)
 
 	// Clients
 	a.MainClient, err = kubernetes.NewForConfig(a.RestConfig)
