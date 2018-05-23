@@ -44,7 +44,7 @@ func NamespaceName(namespace string) zapcore.Field {
 	return zap.String("namespace", namespace)
 }
 
-func IterationName(iteration uint32) zapcore.Field {
+func Iteration(iteration uint32) zapcore.Field {
 	return zap.Uint32("iter", iteration)
 }
 
