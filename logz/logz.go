@@ -48,7 +48,21 @@ func Iteration(iteration uint32) zapcore.Field {
 	return zap.Uint32("iter", iteration)
 }
 
-func Logger(loggingLevel, logEncoding string) *zap.Logger {
+func Logger(level zapcore.Level, encoder func(zapcore.EncoderConfig) zapcore.Encoder) *zap.Logger {
+	cfg := zap.NewProductionEncoderConfig()
+	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	lockedSyncer := zapcore.Lock(zapcore.AddSync(os.Stderr))
+	return zap.New(
+		zapcore.NewCore(
+			encoder(cfg),
+			lockedSyncer,
+			level,
+		),
+		zap.ErrorOutput(lockedSyncer),
+	)
+}
+
+func LoggerStr(loggingLevel, logEncoding string) *zap.Logger {
 	var levelEnabler zapcore.Level
 	switch loggingLevel {
 	case "debug":
@@ -66,15 +80,5 @@ func Logger(loggingLevel, logEncoding string) *zap.Logger {
 	} else {
 		logEncoder = zapcore.NewJSONEncoder
 	}
-	cfg := zap.NewProductionEncoderConfig()
-	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
-	lockedSyncer := zapcore.Lock(zapcore.AddSync(os.Stderr))
-	return zap.New(
-		zapcore.NewCore(
-			logEncoder(cfg),
-			lockedSyncer,
-			levelEnabler,
-		),
-		zap.ErrorOutput(lockedSyncer),
-	)
+	return Logger(levelEnabler, logEncoder)
 }
