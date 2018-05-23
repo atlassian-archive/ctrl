@@ -51,12 +51,12 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 
 		readyForWork := make(chan struct{})
 		queueGvk := wq.newQueueForGvk(descr.Gvk)
-		gvkLogger := config.Logger.With(logz.Gvk(descr.Gvk))
+		groupKind := descr.Gvk.GroupKind()
+		controllerLogger := config.Logger.With(logz.ControllerGk(groupKind))
 		constructorConfig := config
-		constructorConfig.Logger = gvkLogger
+		constructorConfig.Logger = controllerLogger
 
 		// Extra controller data
-		groupKind := descr.Gvk.GroupKind()
 		objectName := replacer.Replace(groupKind.String())
 
 		// Extra api data
@@ -105,9 +105,9 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 				return nil, errors.Errorf("controller for GVK %s should have registered an informer for that GVK", descr.Gvk)
 			}
 			inf.AddEventHandler(&GenericHandler{
-				Logger:       gvkLogger,
+				Logger:       controllerLogger,
 				WorkQueue:    queueGvk,
-				ZapNameField: descr.ZapNameField,
+				ZapNameField: logz.ControllerName,
 			})
 
 			controllers[descr.Gvk] = constructed.Interface
@@ -122,7 +122,6 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 
 			holders[descr.Gvk] = Holder{
 				Cntrlr:            constructed.Interface,
-				ZapNameField:      descr.ZapNameField,
 				ReadyForWork:      readyForWork,
 				objectProcessTime: objectProcessTime,
 			}
@@ -138,7 +137,6 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 
 			serverHolders[descr.Gvk] = ServerHolder{
 				Server:       constructed.Server,
-				ZapNameField: descr.ZapNameField,
 				requestCount: requestCount,
 				requestTime:  requestTime,
 			}
@@ -234,14 +232,12 @@ func addMiddleware(requestCount *prometheus.CounterVec, requestTime prometheus.H
 
 type Holder struct {
 	Cntrlr            Interface
-	ZapNameField      ZapNameField
 	ReadyForWork      <-chan struct{}
 	objectProcessTime prometheus.Histogram
 }
 
 type ServerHolder struct {
 	Server       Server
-	ZapNameField ZapNameField
 	ReadyForWork <-chan struct{}
 	requestCount *prometheus.CounterVec
 	requestTime  prometheus.Histogram

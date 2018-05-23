@@ -8,24 +8,27 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// LookupHandler is a handler for objects that can be mapped to some parent object
-// through the use of an SharedIndexInformer.
+// LookupHandler is a handler for controlled objects that can be mapped to some controller object
+// through the use of a Lookup function.
+// This handler assumes that the Logger already has the ctrl_gk field set.
 type LookupHandler struct {
-	Logger       *zap.Logger
-	WorkQueue    WorkQueueProducer
-	ZapNameField ZapNameField
+	Logger    *zap.Logger
+	WorkQueue WorkQueueProducer
 
 	Lookup func(runtime.Object) ([]runtime.Object, error)
 }
 
-func (e *LookupHandler) enqueueMapped(logger *zap.Logger, obj meta_v1.Object) {
+func (e *LookupHandler) enqueueMapped(obj meta_v1.Object, addUpdateDelete string) {
+	logger := e.loggerForObj(obj)
 	objs, err := e.Lookup(obj.(runtime.Object))
 	if err != nil {
-		logger.Error("Failed to get objects from index", zap.Error(err))
+		logger.Error("Failed to lookup objects", zap.Error(err))
 		return
 	}
 	for _, o := range objs {
 		metaobj := o.(meta_v1.Object)
+		logger.With(logz.Controller(metaobj)).Sugar().
+			Infof("Enqueuing controller object because controlled object was %s", addUpdateDelete)
 		e.WorkQueue.Add(QueueKey{
 			Namespace: metaobj.GetNamespace(),
 			Name:      metaobj.GetName(),
@@ -34,42 +37,32 @@ func (e *LookupHandler) enqueueMapped(logger *zap.Logger, obj meta_v1.Object) {
 }
 
 func (e *LookupHandler) OnAdd(obj interface{}) {
-	logger := e.loggerForObj(obj)
-	metaObj := obj.(meta_v1.Object)
-	logger.Info("Enqueuing mapped objects because it was added")
-	e.enqueueMapped(logger, metaObj)
+	e.enqueueMapped(obj.(meta_v1.Object), "added")
 }
 
 func (e *LookupHandler) OnUpdate(oldObj, newObj interface{}) {
-	logger := e.loggerForObj(newObj)
-	metaObj := newObj.(meta_v1.Object)
-	logger.Info("Enqueuing mapped objects because it was updated")
-	e.enqueueMapped(logger, metaObj)
+	e.enqueueMapped(newObj.(meta_v1.Object), "updated")
 }
 
 func (e *LookupHandler) OnDelete(obj interface{}) {
-	logger := e.loggerForObj(obj)
 	metaObj, ok := obj.(meta_v1.Object)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			logger.Sugar().Errorf("Delete event with unrecognized object type: %T", obj)
+			e.Logger.Sugar().Errorf("Delete event with unrecognized object type: %T", obj)
 			return
 		}
 		metaObj, ok = tombstone.Obj.(meta_v1.Object)
 		if !ok {
-			logger.Sugar().Errorf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
+			e.Logger.Sugar().Errorf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
 			return
 		}
 	}
-	e.enqueueMapped(logger, metaObj)
+	e.enqueueMapped(metaObj, "deleted")
 }
 
-func (e *LookupHandler) loggerForObj(obj interface{}) *zap.Logger {
-	logger := e.Logger
-	metaObj, ok := obj.(meta_v1.Object)
-	if ok { // This is conditional to deal with tombstones on delete event
-		logger = logger.With(logz.Namespace(metaObj), e.ZapNameField(metaObj.GetName()))
-	}
-	return logger
+// loggerForObj returns a logger with fields for a controlled object.
+func (e *LookupHandler) loggerForObj(obj meta_v1.Object) *zap.Logger {
+	return e.Logger.With(logz.Namespace(obj), logz.Object(obj),
+		logz.ObjectGk(obj.(runtime.Object).GetObjectKind().GroupVersionKind().GroupKind()))
 }

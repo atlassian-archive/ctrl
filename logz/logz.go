@@ -9,8 +9,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func Gvk(gvk schema.GroupVersionKind) zapcore.Field {
-	return zap.Stringer("gvk", gvk)
+func Controller(obj meta_v1.Object) zapcore.Field {
+	return ControllerName(obj.GetName())
+}
+
+func ControllerName(name string) zapcore.Field {
+	return zap.String("ctrl_name", name)
+}
+
+func ControllerGk(gk schema.GroupKind) zapcore.Field {
+	return zap.Stringer("ctrl_gk", &gk)
 }
 
 func Object(obj meta_v1.Object) zapcore.Field {
@@ -18,7 +26,11 @@ func Object(obj meta_v1.Object) zapcore.Field {
 }
 
 func ObjectName(name string) zapcore.Field {
-	return zap.String("object_name", name)
+	return zap.String("obj_name", name)
+}
+
+func ObjectGk(gk schema.GroupKind) zapcore.Field {
+	return zap.Stringer("obj_gk", &gk)
 }
 
 func Namespace(obj meta_v1.Object) zapcore.Field {

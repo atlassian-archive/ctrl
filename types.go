@@ -21,8 +21,7 @@ type ZapNameField func(name string) zap.Field
 
 type Descriptor struct {
 	// Group Version Kind of objects a controller can process.
-	Gvk          schema.GroupVersionKind
-	ZapNameField ZapNameField
+	Gvk schema.GroupVersionKind
 }
 
 type Server interface {
