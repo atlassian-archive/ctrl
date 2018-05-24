@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 	"net/http/pprof"
-	"sync"
 	"time"
 
+	"github.com/atlassian/ctrl"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/prometheus/client_golang/prometheus"
@@ -43,7 +43,7 @@ func (a *AuxServer) Run(ctx context.Context) error {
 		ReadTimeout:  readTimeout,
 		IdleTimeout:  idleTimeout,
 	}
-	return startStopServer(ctx, srv, shutdownTimeout)
+	return ctrl.StartStopServer(ctx, srv, shutdownTimeout)
 }
 
 func (a *AuxServer) constructHandler() *chi.Mux {
@@ -64,31 +64,6 @@ func (a *AuxServer) constructHandler() *chi.Mux {
 	}
 
 	return router
-}
-
-func startStopServer(ctx context.Context, srv *http.Server, shutdownTimeout time.Duration) error {
-	var wg sync.WaitGroup
-	defer wg.Wait() // wait for goroutine to shutdown active connections
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		<-ctx.Done()
-		c, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-		defer cancel()
-		if srv.Shutdown(c) != nil {
-			srv.Close()
-		}
-	}()
-
-	err := srv.ListenAndServe()
-	if err != http.ErrServerClosed {
-		// Failed to start or dirty shutdown
-		return err
-	}
-	// Clean shutdown
-	return nil
 }
 
 func (a *AuxServer) setServerHeader(next http.Handler) http.Handler {
