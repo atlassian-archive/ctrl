@@ -1,6 +1,7 @@
 package ctrl
 
 import (
+	goruntime "runtime"
 	"sync/atomic"
 	"time"
 
@@ -29,6 +30,7 @@ func (g *Generic) worker() {
 }
 
 func (g *Generic) processNextWorkItem() bool {
+
 	key, quit := g.queue.get()
 	if quit {
 		return false
@@ -60,7 +62,17 @@ func (g *Generic) handleErr(logger *zap.Logger, retriable bool, err error, key g
 	g.queue.forget(key)
 }
 
-func (g *Generic) processKey(logger *zap.Logger, holder Holder, key gvkQueueKey) (bool /*retriable*/, error) {
+func (g *Generic) processKey(logger *zap.Logger, holder Holder, key gvkQueueKey) (retriable bool, processingErr error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(goruntime.Error); ok {
+				panic(r)
+			}
+			g.logger.Sugar().Warnf("recovering from panic %v", r)
+			retriable, processingErr = false, r.(error)
+		}
+	}()
+
 	cntrlr := holder.Cntrlr
 	informer := g.Informers[key.gvk]
 	obj, exists, err := getFromIndexer(informer.GetIndexer(), key.gvk, key.Namespace, key.Name)
@@ -81,7 +93,7 @@ func (g *Generic) processKey(logger *zap.Logger, holder Holder, key gvkQueueKey)
 		logger.Sugar().Infof("Synced in %v%s", totalTime, msg)
 	}()
 
-	retriable, err := cntrlr.Process(&ProcessContext{
+	r, err := cntrlr.Process(&ProcessContext{
 		Logger: logger,
 		Object: obj,
 	})
@@ -89,7 +101,7 @@ func (g *Generic) processKey(logger *zap.Logger, holder Holder, key gvkQueueKey)
 		msg = " (conflict)"
 		err = nil
 	}
-	return retriable, err
+	return r, err
 }
 
 func getFromIndexer(indexer cache.Indexer, gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, bool /*exists */, error) {
