@@ -1,0 +1,21 @@
+dist: trusty
+sudo: false
+language: go
+
+cache:
+  directories:
+    - $GOPATH/pkg/dep
+
+go:
+  - "1.x"
+
+os:
+  - linux
+
+install:
+  - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+  - make setup
+
+script:
+  - make test
+  - make lint
