@@ -14,3 +14,7 @@ fmt:
 .PHONY: lint
 lint:
 	gometalinter ./...
+
+.PHONY: test
+test:
+	go test -cover -race ./...
