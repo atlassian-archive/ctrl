@@ -4,7 +4,7 @@ ALL_GO_FILES=$$(find . -type f -name '*.go' -not -path "./vendor/*")
 setup:
 	go get -u golang.org/x/tools/cmd/goimports
 	go get -u github.com/alecthomas/gometalinter
-	gometalinter --install
+	gometalinter --install --force
 	dep ensure
 
 .PHONY: fmt
