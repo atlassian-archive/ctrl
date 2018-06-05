@@ -52,10 +52,6 @@ func (q *workQueue) addRateLimited(item gvkQueueKey) {
 	q.queue.AddRateLimited(item)
 }
 
-func (q *workQueue) addAfter(item gvkQueueKey, duration time.Duration) {
-	q.queue.AddAfter(item, duration)
-}
-
 func (q *workQueue) newQueueForGvk(gvk schema.GroupVersionKind) *gvkQueue {
 	return &gvkQueue{
 		queue: q.queue,

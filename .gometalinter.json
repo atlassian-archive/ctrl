@@ -1,8 +1,12 @@
 {
   "Concurrency": 4,
-  "Deadline": "60s",
+  "Cyclo": 15,
+  "Deadline": "2m",
   "Disable": [
-    "golint"
+    "interfacer"
+  ],
+  "Exclude": [
+    "comment"
   ],
   "Test": true,
   "Vendor": true
