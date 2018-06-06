@@ -1,7 +1,7 @@
 {
   "Concurrency": 4,
   "Cyclo": 15,
-  "Deadline": "2m",
+  "Deadline": "5m",
   "Disable": [
     "interfacer"
   ],
