@@ -25,7 +25,8 @@ func StartStopTLSServer(ctx context.Context, srv *http.Server, shutdownTimeout t
 		c, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
 		if srv.Shutdown(c) != nil {
-			srv.Close()
+			srv.Close() // nolint: errcheck,gas
+			// unhandled error above, but we are terminating anyway
 		}
 	}()
 

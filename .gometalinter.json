@@ -1,0 +1,13 @@
+{
+  "Concurrency": 4,
+  "Cyclo": 15,
+  "Deadline": "2m",
+  "Disable": [
+    "interfacer"
+  ],
+  "Exclude": [
+    "comment"
+  ],
+  "Test": true,
+  "Vendor": true
+}
