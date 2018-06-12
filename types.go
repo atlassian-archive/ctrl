@@ -22,6 +22,8 @@ type ZapNameField func(name string) zap.Field
 type Descriptor struct {
 	// Group Version Kind of objects a controller can process.
 	Gvk schema.GroupVersionKind
+	// IsInterestingUpdate is an optional predicate that is consulted before enqueuing an object on update event.
+	IsInterestingUpdate func(oldObj, newObj runtime.Object) bool
 }
 
 type Server interface {

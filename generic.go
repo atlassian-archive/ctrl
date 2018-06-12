@@ -105,9 +105,10 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 				return nil, errors.Errorf("controller for GVK %s should have registered an informer for that GVK", descr.Gvk)
 			}
 			inf.AddEventHandler(&GenericHandler{
-				Logger:       controllerLogger,
-				WorkQueue:    queueGvk,
-				ZapNameField: logz.ControllerName,
+				Logger:              controllerLogger,
+				WorkQueue:           queueGvk,
+				IsInterestingUpdate: descr.IsInterestingUpdate,
+				ZapNameField:        logz.ControllerName,
 			})
 
 			controllers[descr.Gvk] = constructed.Interface

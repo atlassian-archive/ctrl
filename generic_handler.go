@@ -4,14 +4,17 @@ import (
 	"github.com/atlassian/ctrl/logz"
 	"go.uber.org/zap"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
 // This handler assumes that the Logger already has the obj_gk/ctrl_gk field set.
 type GenericHandler struct {
-	Logger       *zap.Logger
-	WorkQueue    WorkQueueProducer
-	ZapNameField ZapNameField
+	Logger    *zap.Logger
+	WorkQueue WorkQueueProducer
+	// IsInterestingUpdate is an optional predicate that is consulted before enqueuing an object on update event.
+	IsInterestingUpdate func(oldObj, newObj runtime.Object) bool
+	ZapNameField        ZapNameField
 }
 
 func (g *GenericHandler) OnAdd(obj interface{}) {
@@ -19,6 +22,9 @@ func (g *GenericHandler) OnAdd(obj interface{}) {
 }
 
 func (g *GenericHandler) OnUpdate(oldObj, newObj interface{}) {
+	if g.IsInterestingUpdate != nil && !g.IsInterestingUpdate(oldObj.(runtime.Object), newObj.(runtime.Object)) {
+		return
+	}
 	g.add(newObj.(meta_v1.Object), "updated")
 }
 
