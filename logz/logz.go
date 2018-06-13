@@ -51,6 +51,7 @@ func Iteration(iteration uint32) zapcore.Field {
 func Logger(level zapcore.Level, encoder func(zapcore.EncoderConfig) zapcore.Encoder) *zap.Logger {
 	cfg := zap.NewProductionEncoderConfig()
 	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	cfg.TimeKey = "time"
 	lockedSyncer := zapcore.Lock(zapcore.AddSync(os.Stderr))
 	return zap.New(
 		zapcore.NewCore(
