@@ -2,9 +2,7 @@ package ctrl
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/ash2k/stager"
@@ -23,6 +21,8 @@ const (
 	// Work queue deduplicates scheduled keys. This is the period it waits for duplicate keys before letting the work
 	// to be dequeued.
 	workDeduplicationPeriod = 50 * time.Millisecond
+
+	metricsNamespace = "ctrl"
 )
 
 type Generic struct {
@@ -45,7 +45,6 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 		queue: queue,
 		workDeduplicationPeriod: workDeduplicationPeriod,
 	}
-	replacer := strings.NewReplacer(".", "_", "-", "_", "/", "_")
 	for _, constr := range constructors {
 		descr := constr.Describe()
 
@@ -56,22 +55,14 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 		constructorConfig := config
 		constructorConfig.Logger = controllerLogger
 
-		// Extra controller data
-		objectName := replacer.Replace(groupKind.String())
-
 		// Extra api data
-		requestCount := prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: fmt.Sprintf("request_%s_count", objectName),
-				Help: fmt.Sprintf("Cumulative number of %s processed", &groupKind),
-			},
-			[]string{"url", "method", "status"},
-		)
-		requestTime := prometheus.NewHistogram(
+		requestTime := prometheus.NewHistogramVec(
 			prometheus.HistogramOpts{
-				Name: fmt.Sprintf("request_%s_time", objectName),
-				Help: fmt.Sprintf("Number of seconds each request to %s takes", &groupKind),
+				Namespace: metricsNamespace,
+				Name:      "request_time_seconds",
+				Help:      "Number of seconds each request takes to the controller provided server",
 			},
+			[]string{"url", "method", "status", "controller", "object"},
 		)
 
 		var allMetrics []prometheus.Collector
@@ -82,7 +73,7 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 				ReadyForWork: func() {
 					close(readyForWork)
 				},
-				Middleware:  addMiddleware(requestCount, requestTime),
+				Middleware:  addMetricsMiddleware(requestTime, config.AppName, groupKind.String()),
 				Informers:   informers,
 				Controllers: controllers,
 				WorkQueue:   queueGvk,
@@ -112,15 +103,18 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 
 			controllers[descr.Gvk] = constructed.Interface
 
-			objectProcessTime := prometheus.NewHistogram(
+			// objectProcessTime := prometheus.NewHistogram(
+			objectProcessTime := prometheus.NewHistogramVec(
 				prometheus.HistogramOpts{
-					Namespace: constructorConfig.AppName,
-					Name:      fmt.Sprintf("process_%s_seconds", objectName),
-					Help:      fmt.Sprintf("Histogram measuring the time it took to process a %s", &groupKind),
+					Namespace: metricsNamespace,
+					Name:      "process_object_seconds",
+					Help:      "Histogram measuring the time it took to process an object",
 				},
+				[]string{"controller", "object"},
 			)
 
 			holders[descr.Gvk] = Holder{
+				AppName:           config.AppName,
 				Cntrlr:            constructed.Interface,
 				ReadyForWork:      readyForWork,
 				objectProcessTime: objectProcessTime,
@@ -136,12 +130,12 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 			servers[descr.Gvk] = constructed.Server
 
 			serverHolders[descr.Gvk] = ServerHolder{
-				Server:       constructed.Server,
-				requestCount: requestCount,
-				requestTime:  requestTime,
+				AppName:     config.AppName,
+				Server:      constructed.Server,
+				requestTime: requestTime,
 			}
 
-			allMetrics = append(allMetrics, requestCount, requestTime)
+			allMetrics = append(allMetrics, requestTime)
 		}
 
 		for _, metric := range allMetrics {
@@ -216,7 +210,7 @@ func (g *Generic) Run(ctx context.Context) error {
 	return group.Wait()
 }
 
-func addMiddleware(requestCount *prometheus.CounterVec, requestTime prometheus.Histogram) func(http.Handler) http.Handler {
+func addMetricsMiddleware(requestTime *prometheus.HistogramVec, controller string, object string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			res := chimw.NewWrapResponseWriter(w, r.ProtoMajor)
@@ -224,21 +218,21 @@ func addMiddleware(requestCount *prometheus.CounterVec, requestTime prometheus.H
 			next.ServeHTTP(res, r)
 			tn := time.Since(t0)
 
-			requestCount.WithLabelValues(r.URL.Path, r.Method, string(res.Status())).Inc()
-			requestTime.Observe(tn.Seconds())
+			requestTime.WithLabelValues(r.URL.Path, r.Method, string(res.Status()), controller, object).Observe(tn.Seconds())
 		})
 	}
 }
 
 type Holder struct {
+	AppName           string
 	Cntrlr            Interface
 	ReadyForWork      <-chan struct{}
-	objectProcessTime prometheus.Histogram
+	objectProcessTime *prometheus.HistogramVec
 }
 
 type ServerHolder struct {
+	AppName      string
 	Server       Server
 	ReadyForWork <-chan struct{}
-	requestCount *prometheus.CounterVec
-	requestTime  prometheus.Histogram
+	requestTime  *prometheus.HistogramVec
 }
