@@ -111,15 +111,25 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 				},
 				[]string{"controller", "namespace", "name", "groupkind"},
 			)
+			objectProcessErrors := prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricsNamespace,
+					Name:      "process_object_errors",
+					Help:      "Records the number of times an error was triggered while processing an object",
+				},
+				[]string{"controller", "namespace", "name", "groupKind", "retriable"},
+			)
 
 			holders[descr.Gvk] = Holder{
-				AppName:           config.AppName,
-				Cntrlr:            constructed.Interface,
-				ReadyForWork:      readyForWork,
-				objectProcessTime: objectProcessTime,
+				AppName:             config.AppName,
+				Cntrlr:              constructed.Interface,
+				ReadyForWork:        readyForWork,
+				objectProcessTime:   objectProcessTime,
+				objectProcessErrors: objectProcessErrors,
 			}
 
 			allMetrics = append(allMetrics, objectProcessTime)
+			allMetrics = append(allMetrics, objectProcessErrors)
 		}
 
 		if constructed.Server != nil {
@@ -223,10 +233,11 @@ func addMetricsMiddleware(requestTime *prometheus.HistogramVec, controller, grou
 }
 
 type Holder struct {
-	AppName           string
-	Cntrlr            Interface
-	ReadyForWork      <-chan struct{}
-	objectProcessTime *prometheus.HistogramVec
+	AppName             string
+	Cntrlr              Interface
+	ReadyForWork        <-chan struct{}
+	objectProcessTime   *prometheus.HistogramVec
+	objectProcessErrors *prometheus.CounterVec
 }
 
 type ServerHolder struct {
