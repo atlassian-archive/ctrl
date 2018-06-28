@@ -128,8 +128,7 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 				objectProcessErrors: objectProcessErrors,
 			}
 
-			allMetrics = append(allMetrics, objectProcessTime)
-			allMetrics = append(allMetrics, objectProcessErrors)
+			allMetrics = append(allMetrics, objectProcessTime, objectProcessErrors)
 		}
 
 		if constructed.Server != nil {
