@@ -67,7 +67,7 @@ func (g *Generic) processKey(logger *zap.Logger, holder Holder, key gvkQueueKey)
 	informer := g.Informers[key.gvk]
 	obj, exists, err := getFromIndexer(informer.GetIndexer(), key.gvk, key.Namespace, key.Name)
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to get object by key %s", key)
+		return false, errors.Wrapf(err, "failed to get object by key %s", key.String())
 	}
 	if !exists {
 		logger.Debug("Object not in cache. Was deleted?")
