@@ -61,11 +61,13 @@ func (g *Generic) handleErr(logger *zap.Logger, retriable bool, err error, key g
 }
 
 func (g *Generic) processKey(logger *zap.Logger, holder Holder, key gvkQueueKey) (bool /*retriable*/, error) {
+	groupKind := key.gvk.GroupKind()
+
 	cntrlr := holder.Cntrlr
 	informer := g.Informers[key.gvk]
 	obj, exists, err := getFromIndexer(informer.GetIndexer(), key.gvk, key.Namespace, key.Name)
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to get object by key %s", key)
+		return false, errors.Wrapf(err, "failed to get object by key %s", key.String())
 	}
 	if !exists {
 		logger.Debug("Object not in cache. Was deleted?")
@@ -77,7 +79,7 @@ func (g *Generic) processKey(logger *zap.Logger, holder Holder, key gvkQueueKey)
 	msg := ""
 	defer func() {
 		totalTime := time.Since(startTime)
-		holder.objectProcessTime.Observe(totalTime.Seconds())
+		holder.objectProcessTime.WithLabelValues(holder.AppName, key.Namespace, key.Name, groupKind.String()).Observe(totalTime.Seconds())
 		logger.Sugar().Infof("Synced in %v%s", totalTime, msg)
 	}()
 
