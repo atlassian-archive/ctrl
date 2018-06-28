@@ -62,7 +62,7 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 				Name:      "request_time_seconds",
 				Help:      "Number of seconds each request takes to the controller provided server",
 			},
-			[]string{"url", "method", "status", "controller", "object"},
+			[]string{"url", "method", "status", "controller", "groupkind"},
 		)
 
 		var allMetrics []prometheus.Collector
@@ -103,14 +103,13 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 
 			controllers[descr.Gvk] = constructed.Interface
 
-			// objectProcessTime := prometheus.NewHistogram(
 			objectProcessTime := prometheus.NewHistogramVec(
 				prometheus.HistogramOpts{
 					Namespace: metricsNamespace,
 					Name:      "process_object_seconds",
 					Help:      "Histogram measuring the time it took to process an object",
 				},
-				[]string{"controller", "object"},
+				[]string{"controller", "namespace", "name", "groupkind"},
 			)
 
 			holders[descr.Gvk] = Holder{
@@ -210,7 +209,7 @@ func (g *Generic) Run(ctx context.Context) error {
 	return group.Wait()
 }
 
-func addMetricsMiddleware(requestTime *prometheus.HistogramVec, controller string, object string) func(http.Handler) http.Handler {
+func addMetricsMiddleware(requestTime *prometheus.HistogramVec, controller, groupKind string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			res := chimw.NewWrapResponseWriter(w, r.ProtoMajor)
@@ -218,7 +217,7 @@ func addMetricsMiddleware(requestTime *prometheus.HistogramVec, controller strin
 			next.ServeHTTP(res, r)
 			tn := time.Since(t0)
 
-			requestTime.WithLabelValues(r.URL.Path, r.Method, string(res.Status()), controller, object).Observe(tn.Seconds())
+			requestTime.WithLabelValues(r.URL.Path, r.Method, string(res.Status()), controller, groupKind).Observe(tn.Seconds())
 		})
 	}
 }
