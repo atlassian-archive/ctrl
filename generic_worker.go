@@ -1,6 +1,7 @@
 package ctrl
 
 import (
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -91,6 +92,9 @@ func (g *Generic) processKey(logger *zap.Logger, holder Holder, key gvkQueueKey)
 		msg = " (conflict)"
 		err = nil
 	}
+	holder.objectProcessErrors.
+		WithLabelValues(holder.AppName, key.Namespace, key.Name, groupKind.String(), strconv.FormatBool(retriable)).
+		Inc()
 	return retriable, err
 }
 
