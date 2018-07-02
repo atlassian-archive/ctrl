@@ -109,7 +109,7 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 					Name:      "process_object_seconds",
 					Help:      "Histogram measuring the time it took to process an object",
 				},
-				[]string{"controller", "namespace", "name", "groupkind"},
+				[]string{"controller", "obj_namespace", "name", "groupkind"},
 			)
 			objectProcessErrors := prometheus.NewCounterVec(
 				prometheus.CounterOpts{
@@ -117,7 +117,7 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 					Name:      "process_object_errors",
 					Help:      "Records the number of times an error was triggered while processing an object",
 				},
-				[]string{"controller", "namespace", "name", "groupKind", "retriable"},
+				[]string{"controller", "obj_namespace", "name", "groupkind", "retriable"},
 			)
 
 			holders[descr.Gvk] = Holder{
