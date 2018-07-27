@@ -114,7 +114,7 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 			objectProcessErrors := prometheus.NewCounterVec(
 				prometheus.CounterOpts{
 					Namespace: metricsNamespace,
-					Name:      "process_object_errors",
+					Name:      "process_object_errors_total",
 					Help:      "Records the number of times an error was triggered while processing an object",
 				},
 				[]string{"controller", "object_namespace", "object", "groupkind", "retriable"},
