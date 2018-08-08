@@ -173,7 +173,7 @@ func (g *Generic) Run(ctx context.Context) error {
 	stage := stgr.NextStage()
 	for _, inf := range g.Informers {
 		stage.StartWithChannel(func(stopCh <-chan struct{}) {
-			defer logz.LogStructuredPanic(g.logger)
+			defer logz.LogStructuredPanic()
 			inf.Run(stopCh)
 		})
 	}
@@ -189,7 +189,7 @@ func (g *Generic) Run(ctx context.Context) error {
 	stage = stgr.NextStage()
 	for _, c := range g.Controllers {
 		stage.StartWithContext(func(ctx context.Context) {
-			defer logz.LogStructuredPanic(g.logger)
+			defer logz.LogStructuredPanic()
 			c.Cntrlr.Run(ctx)
 		})
 	}
@@ -206,7 +206,7 @@ func (g *Generic) Run(ctx context.Context) error {
 	stage = stgr.NextStage()
 	for i := 0; i < g.workers; i++ {
 		stage.Start(func() {
-			defer logz.LogStructuredPanic(g.logger)
+			defer logz.LogStructuredPanic()
 			g.worker()
 		})
 	}

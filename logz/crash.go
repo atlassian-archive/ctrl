@@ -1,19 +1,37 @@
 package logz
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"runtime/debug"
-
-	"go.uber.org/zap"
+	"time"
 )
 
-func LogStructuredPanic(logger *zap.Logger) {
+func LogStructuredPanic() {
 	if r := recover(); r != nil {
-		// calling Error() instead of Fatal() or Panic() because those invoke os.Exit and panic()
-		logger.Error(fmt.Sprintf("%v", r),
-			zap.Any("panic", r),
-			zap.String("stack", string(debug.Stack())),
-		)
+		logStructuredPanic(os.Stderr, r, time.Now().Format(time.RFC3339), debug.Stack())
 		panic(r)
 	}
+}
+
+func logStructuredPanic(out io.Writer, i interface{}, time string, stack []byte) {
+	bytes, err := json.Marshal(struct {
+		Level   string `json:"level"`
+		Time    string `json:"time"`
+		Message string `json:"msg"`
+		Stack   string `json:"stack"`
+	}{
+		Level:   "fatal",
+		Time:    time,
+		Message: fmt.Sprintf("%v", i),
+		Stack:   string(stack),
+	})
+	if err != nil {
+		fmt.Fprintf(out, "error while serializing panic: %+v\n", err) // nolint: errcheck, gas
+		fmt.Fprintf(out, "original panic: %+v\n", i)                  // nolint: errcheck, gas
+		return
+	}
+	fmt.Fprintf(out, "%s\n", bytes) // nolint: errcheck, gas
 }

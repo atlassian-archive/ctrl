@@ -130,7 +130,7 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 
 	stage.StartWithContext(func(metricsCtx context.Context) {
 		defer cancel() // if auxSrv fails to start it signals the whole program that it should shut down
-		defer logz.LogStructuredPanic(auxSrv.Logger)
+		defer logz.LogStructuredPanic()
 		auxErr = auxSrv.Run(metricsCtx)
 	})
 
@@ -191,7 +191,7 @@ func (a *App) startLeaderElection(ctx context.Context, configMapsGetter core_v1c
 	}
 	go func() {
 		// note: because le.Run() also adds a logging panic handler panics with be logged 3 times
-		defer logz.LogStructuredPanic(a.Logger)
+		defer logz.LogStructuredPanic()
 		le.Run()
 	}()
 	return ctxRet, startedLeading, nil
