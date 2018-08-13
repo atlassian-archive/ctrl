@@ -172,7 +172,10 @@ func (g *Generic) Run(ctx context.Context) error {
 	// Stage: start all informers then wait on them
 	stage := stgr.NextStage()
 	for _, inf := range g.Informers {
-		stage.StartWithChannel(inf.Run)
+		stage.StartWithChannel(func(stopCh <-chan struct{}) {
+			defer logz.LogStructuredPanic()
+			inf.Run(stopCh)
+		})
 	}
 	g.logger.Info("Waiting for informers to sync")
 	for _, inf := range g.Informers {
@@ -185,7 +188,10 @@ func (g *Generic) Run(ctx context.Context) error {
 	// Stage: start all controllers then wait for them to signal ready for work
 	stage = stgr.NextStage()
 	for _, c := range g.Controllers {
-		stage.StartWithContext(c.Cntrlr.Run)
+		stage.StartWithContext(func(ctx context.Context) {
+			defer logz.LogStructuredPanic()
+			c.Cntrlr.Run(ctx)
+		})
 	}
 	for gvk, c := range g.Controllers {
 		select {
@@ -199,7 +205,10 @@ func (g *Generic) Run(ctx context.Context) error {
 	// Stage: start workers
 	stage = stgr.NextStage()
 	for i := 0; i < g.workers; i++ {
-		stage.Start(g.worker)
+		stage.Start(func() {
+			defer logz.LogStructuredPanic()
+			g.worker()
+		})
 	}
 
 	if len(g.Servers) == 0 {
