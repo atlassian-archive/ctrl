@@ -172,6 +172,7 @@ func (g *Generic) Run(ctx context.Context) error {
 	// Stage: start all informers then wait on them
 	stage := stgr.NextStage()
 	for _, inf := range g.Informers {
+		inf := inf // capture field into a scoped variable to avoid data race
 		stage.StartWithChannel(func(stopCh <-chan struct{}) {
 			defer logz.LogStructuredPanic()
 			inf.Run(stopCh)
@@ -188,6 +189,7 @@ func (g *Generic) Run(ctx context.Context) error {
 	// Stage: start all controllers then wait for them to signal ready for work
 	stage = stgr.NextStage()
 	for _, c := range g.Controllers {
+		c := c // capture field into a scoped variable to avoid data race
 		stage.StartWithContext(func(ctx context.Context) {
 			defer logz.LogStructuredPanic()
 			c.Cntrlr.Run(ctx)
