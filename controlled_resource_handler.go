@@ -29,23 +29,37 @@ type ControlledResourceHandler struct {
 	ControllerGvk   schema.GroupVersionKind
 }
 
+func (g *ControlledResourceHandler) enqueueMapped(metaObj meta_v1.Object, logger *zap.Logger, action string) {
+	name, namespace := g.getControllerNameAndNamespace(metaObj)
+
+	if name == "" {
+		if g.ControllerIndex != nil {
+			controllers, err := g.ControllerIndex.ControllerByObject(
+				metaObj.(runtime.Object).GetObjectKind().GroupVersionKind().GroupKind(), namespace, metaObj.GetName())
+			if err != nil {
+				logger.Error("Failed to get controllers for object", zap.Error(err))
+				return
+			}
+			for _, controller := range controllers {
+				controllerMeta := controller.(meta_v1.Object)
+				g.rebuildControllerByName(logger, controllerMeta.GetNamespace(), controllerMeta.GetName(), action)
+			}
+		}
+	} else {
+		g.rebuildControllerByName(logger, namespace, name, action)
+	}
+}
+
 func (g *ControlledResourceHandler) OnAdd(obj interface{}) {
-	name, namespace := g.getControllerNameAndNamespace(obj.(meta_v1.Object))
-	logger := g.loggerForObj(obj.(meta_v1.Object))
-	g.rebuildControllerByName(logger, namespace, name, "added")
+	metaObj := obj.(meta_v1.Object)
+	logger := g.loggerForObj(metaObj)
+	g.enqueueMapped(metaObj, logger, "added")
 }
 
 func (g *ControlledResourceHandler) OnUpdate(oldObj, newObj interface{}) {
-	oldName, oldNamespace := g.getControllerNameAndNamespace(oldObj.(meta_v1.Object))
-
-	newName, newNamespace := g.getControllerNameAndNamespace(newObj.(meta_v1.Object))
-
-	if oldName != newName { // changed controller of the object
-		logger := g.loggerForObj(oldObj.(meta_v1.Object))
-		g.rebuildControllerByName(logger, oldNamespace, oldName, "updated")
-	}
-	logger := g.loggerForObj(newObj.(meta_v1.Object))
-	g.rebuildControllerByName(logger, newNamespace, newName, "updated")
+	metaObj := oldObj.(meta_v1.Object)
+	logger := g.loggerForObj(oldObj.(meta_v1.Object))
+	g.enqueueMapped(metaObj, logger, "updated")
 }
 
 func (g *ControlledResourceHandler) OnDelete(obj interface{}) {
@@ -63,22 +77,7 @@ func (g *ControlledResourceHandler) OnDelete(obj interface{}) {
 		}
 	}
 	logger := g.loggerForObj(metaObj)
-	name, namespace := g.getControllerNameAndNamespace(metaObj)
-	if name == "" { // No controller object found
-		if g.ControllerIndex != nil {
-			controllers, err := g.ControllerIndex.ControllerByObject(
-				metaObj.(runtime.Object).GetObjectKind().GroupVersionKind().GroupKind(), namespace, metaObj.GetName())
-			if err != nil {
-				logger.Error("Failed to get controllers for object", zap.Error(err))
-				return
-			}
-			for _, controller := range controllers {
-				g.rebuildControllerByName(logger, namespace, controller.(meta_v1.Object).GetName(), "deleted")
-			}
-		}
-	} else {
-		g.rebuildControllerByName(logger, namespace, name, "deleted")
-	}
+	g.enqueueMapped(metaObj, logger, "deleted")
 }
 
 // This method may be called with an empty controllerName.
