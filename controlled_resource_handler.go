@@ -57,9 +57,19 @@ func (g *ControlledResourceHandler) OnAdd(obj interface{}) {
 }
 
 func (g *ControlledResourceHandler) OnUpdate(oldObj, newObj interface{}) {
-	metaObj := oldObj.(meta_v1.Object)
-	logger := g.loggerForObj(oldObj.(meta_v1.Object))
-	g.enqueueMapped(metaObj, logger, "updated")
+	oldMeta := oldObj.(meta_v1.Object)
+	newMeta := newObj.(meta_v1.Object)
+
+	oldName, _ := g.getControllerNameAndNamespace(oldMeta)
+	newName, _ := g.getControllerNameAndNamespace(newMeta)
+
+	if oldName != newName {
+		loggerOld := g.loggerForObj(oldMeta.(meta_v1.Object))
+		g.enqueueMapped(oldMeta, loggerOld, "updated")
+	}
+
+	loggerNew := g.loggerForObj(newMeta.(meta_v1.Object))
+	g.enqueueMapped(newMeta, loggerNew, "updated")
 }
 
 func (g *ControlledResourceHandler) OnDelete(obj interface{}) {
