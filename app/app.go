@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -72,8 +73,11 @@ type App struct {
 }
 
 func (a *App) Run(ctx context.Context) (retErr error) {
-	defer a.Logger.Sync() // nolint: errcheck
-	// unhandled error above, but we are terminating anyway
+	defer func() {
+		if err := a.Logger.Sync(); err != nil {
+			fmt.Printf("Failed to flush (AKA sync) remaining logs: %s\n", err.Error())
+		}
+	}()
 
 	// Controller
 	config := &ctrl.Config{
