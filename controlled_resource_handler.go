@@ -29,8 +29,9 @@ type ControlledResourceHandler struct {
 	ControllerGvk   schema.GroupVersionKind
 }
 
-func (g *ControlledResourceHandler) enqueueMapped(metaObj meta_v1.Object, logger *zap.Logger, action string) {
+func (g *ControlledResourceHandler) enqueueMapped(metaObj meta_v1.Object, action string) {
 	name, namespace := g.getControllerNameAndNamespace(metaObj)
+	logger := g.loggerForObj(metaObj)
 
 	if name == "" {
 		if g.ControllerIndex != nil {
@@ -52,8 +53,7 @@ func (g *ControlledResourceHandler) enqueueMapped(metaObj meta_v1.Object, logger
 
 func (g *ControlledResourceHandler) OnAdd(obj interface{}) {
 	metaObj := obj.(meta_v1.Object)
-	logger := g.loggerForObj(metaObj)
-	g.enqueueMapped(metaObj, logger, "added")
+	g.enqueueMapped(metaObj, "added")
 }
 
 func (g *ControlledResourceHandler) OnUpdate(oldObj, newObj interface{}) {
@@ -64,12 +64,10 @@ func (g *ControlledResourceHandler) OnUpdate(oldObj, newObj interface{}) {
 	newName, _ := g.getControllerNameAndNamespace(newMeta)
 
 	if oldName != newName {
-		loggerOld := g.loggerForObj(oldMeta.(meta_v1.Object))
-		g.enqueueMapped(oldMeta, loggerOld, "updated")
+		g.enqueueMapped(oldMeta, "updated")
 	}
 
-	loggerNew := g.loggerForObj(newMeta.(meta_v1.Object))
-	g.enqueueMapped(newMeta, loggerNew, "updated")
+	g.enqueueMapped(newMeta, "updated")
 }
 
 func (g *ControlledResourceHandler) OnDelete(obj interface{}) {
@@ -86,8 +84,7 @@ func (g *ControlledResourceHandler) OnDelete(obj interface{}) {
 			return
 		}
 	}
-	logger := g.loggerForObj(metaObj)
-	g.enqueueMapped(metaObj, logger, "deleted")
+	g.enqueueMapped(metaObj, "deleted")
 }
 
 // This method may be called with an empty controllerName.
