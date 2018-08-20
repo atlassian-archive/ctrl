@@ -9,6 +9,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+const (
+	updatedAction = "updated"
+	deletedAction = "deleted"
+	addedAction   = "added"
+)
+
 // ControllerIndex is an index from controlled to controller objects.
 type ControllerIndex interface {
 	// ControllerByObject returns controller objects that own or want to own an object with a particular Group, Kind,
@@ -53,7 +59,7 @@ func (g *ControlledResourceHandler) enqueueMapped(metaObj meta_v1.Object, action
 
 func (g *ControlledResourceHandler) OnAdd(obj interface{}) {
 	metaObj := obj.(meta_v1.Object)
-	g.enqueueMapped(metaObj, "added")
+	g.enqueueMapped(metaObj, addedAction)
 }
 
 func (g *ControlledResourceHandler) OnUpdate(oldObj, newObj interface{}) {
@@ -64,10 +70,10 @@ func (g *ControlledResourceHandler) OnUpdate(oldObj, newObj interface{}) {
 	newName, _ := g.getControllerNameAndNamespace(newMeta)
 
 	if oldName != newName {
-		g.enqueueMapped(oldMeta, "updated")
+		g.enqueueMapped(oldMeta, updatedAction)
 	}
 
-	g.enqueueMapped(newMeta, "updated")
+	g.enqueueMapped(newMeta, updatedAction)
 }
 
 func (g *ControlledResourceHandler) OnDelete(obj interface{}) {
@@ -84,7 +90,7 @@ func (g *ControlledResourceHandler) OnDelete(obj interface{}) {
 			return
 		}
 	}
-	g.enqueueMapped(metaObj, "deleted")
+	g.enqueueMapped(metaObj, deletedAction)
 }
 
 // This method may be called with an empty controllerName.
