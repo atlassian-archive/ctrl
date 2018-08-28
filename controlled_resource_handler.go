@@ -100,7 +100,10 @@ func (g *ControlledResourceHandler) rebuildControllerByName(logger *zap.Logger, 
 		logger.Info("Object has no controller, so nothing was enqueued")
 		return
 	}
-	logger.Sugar().Infof("Enqueuing controller object %q because controlled object was %s", controllerName, addUpdateDelete)
+	logger.
+		With(logz.DelegateName(controllerName)).
+		With(logz.DelegateGk(g.ControllerGvk.GroupKind())).
+		Sugar().Infof("Enqueuing controller object %q because controlled object was %s", controllerName, addUpdateDelete)
 	g.WorkQueue.Add(QueueKey{
 		Namespace: namespace,
 		Name:      controllerName,

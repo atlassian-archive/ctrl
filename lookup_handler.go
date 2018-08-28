@@ -29,8 +29,10 @@ func (e *LookupHandler) enqueueMapped(obj meta_v1.Object, addUpdateDelete string
 	}
 	for _, o := range objs {
 		metaobj := o.(meta_v1.Object)
-		logger.Sugar().Infof("Enqueuing looked up object '%s' because controlled object was %s",
-			obj.GetNamespace(), obj.GetName(), addUpdateDelete)
+		logger.
+			With(logz.Delegate(metaobj)).
+			With(logz.DelegateGk(o.GetObjectKind().GroupVersionKind().GroupKind())).
+			Sugar().Infof("Enqueuing looked up object '%s' because parent object was %s", obj.GetNamespace(), obj.GetName(), addUpdateDelete)
 		e.WorkQueue.Add(QueueKey{
 			Namespace: metaobj.GetNamespace(),
 			Name:      metaobj.GetName(),
