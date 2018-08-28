@@ -33,21 +33,10 @@ func ObjectGk(gk schema.GroupKind) zapcore.Field {
 	return zap.Stringer("obj_gk", &gk)
 }
 
-// Delegate returns a zap field used to record DelegateName.
-func Delegate(obj meta_v1.Object) zapcore.Field {
-	return DelegateName(obj.GetName())
-}
-
-// DelegateName is a zap field used primarily inside ResourceEventHandlers to record
-// the actual object name enqueued after a lookup or ownerref mapping.
-func DelegateName(name string) zapcore.Field {
-	return zap.String("delegate_name", name)
-}
-
-// DelegateGk is a zap field used primarily inside ResourceEventHandlers to record
-// the actual object gk enqueued after a lookup or ownerref mapping.
-func DelegateGk(gk schema.GroupKind) zapcore.Field {
-	return zap.Stringer("delegate_gk", &gk)
+// Operation is a zap field used in ResourceEventHandler to identify the operation
+// that the logs are being produced from.
+func Operation(operation string) zapcore.Field {
+	return zap.String("operation", operation)
 }
 
 func Namespace(obj meta_v1.Object) zapcore.Field {

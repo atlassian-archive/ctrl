@@ -17,40 +17,43 @@ type GenericHandler struct {
 }
 
 func (g *GenericHandler) OnAdd(obj interface{}) {
-	g.add(obj.(meta_v1.Object), "added")
+	logger := g.Logger.With(logz.Operation("added"))
+	g.add(logger, obj.(meta_v1.Object))
 }
 
 func (g *GenericHandler) OnUpdate(oldObj, newObj interface{}) {
-	g.add(newObj.(meta_v1.Object), "updated")
+	logger := g.Logger.With(logz.Operation("updated"))
+	g.add(logger, newObj.(meta_v1.Object))
 }
 
 func (g *GenericHandler) OnDelete(obj interface{}) {
 	metaObj, ok := obj.(meta_v1.Object)
+	logger := g.Logger.With(logz.Operation("deleted"))
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			g.Logger.Sugar().Errorf("Delete event with unrecognized object type: %T", obj)
+			logger.Sugar().Errorf("Delete event with unrecognized object type: %T", obj)
 			return
 		}
 		metaObj, ok = tombstone.Obj.(meta_v1.Object)
 		if !ok {
-			g.Logger.Sugar().Errorf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
+			logger.Sugar().Errorf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
 			return
 		}
 	}
-	g.add(metaObj, "deleted")
+	g.add(logger, metaObj)
 }
 
-func (g *GenericHandler) add(obj meta_v1.Object, addUpdateDelete string) {
-	g.loggerForObj(obj).Sugar().Infof("Enqueuing object because it was %s", addUpdateDelete)
+func (g *GenericHandler) add(logger *zap.Logger, obj meta_v1.Object) {
+	g.loggerForObj(logger, obj).Info("Enqueuing object")
 	g.WorkQueue.Add(QueueKey{
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	})
 }
 
-func (g *GenericHandler) loggerForObj(obj meta_v1.Object) *zap.Logger {
-	return g.Logger.With(logz.Namespace(obj),
+func (g *GenericHandler) loggerForObj(logger *zap.Logger, obj meta_v1.Object) *zap.Logger {
+	return logger.With(logz.Namespace(obj),
 		logz.Object(obj),
 		logz.ObjectGk(g.Gvk.GroupKind()))
 }
