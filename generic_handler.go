@@ -4,14 +4,16 @@ import (
 	"github.com/atlassian/ctrl/logz"
 	"go.uber.org/zap"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
 
 // This handler assumes that the Logger already has the obj_gk/ctrl_gk field set.
 type GenericHandler struct {
-	Logger       *zap.Logger
-	WorkQueue    WorkQueueProducer
-	ZapNameField ZapNameField
+	Logger    *zap.Logger
+	WorkQueue WorkQueueProducer
+
+	Gvk schema.GroupVersionKind
 }
 
 func (g *GenericHandler) OnAdd(obj interface{}) {
@@ -48,5 +50,7 @@ func (g *GenericHandler) add(obj meta_v1.Object, addUpdateDelete string) {
 }
 
 func (g *GenericHandler) loggerForObj(obj meta_v1.Object) *zap.Logger {
-	return g.Logger.With(logz.Namespace(obj), g.ZapNameField(obj.GetName()))
+	return g.Logger.With(logz.Namespace(obj),
+		logz.Object(obj),
+		logz.ObjectGk(g.Gvk.GroupKind()))
 }

@@ -5,6 +5,7 @@ import (
 	"go.uber.org/zap"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -14,6 +15,7 @@ import (
 type LookupHandler struct {
 	Logger    *zap.Logger
 	WorkQueue WorkQueueProducer
+	Gvk       schema.GroupVersionKind
 
 	Lookup func(runtime.Object) ([]runtime.Object, error)
 }
@@ -27,8 +29,8 @@ func (e *LookupHandler) enqueueMapped(obj meta_v1.Object, addUpdateDelete string
 	}
 	for _, o := range objs {
 		metaobj := o.(meta_v1.Object)
-		logger.With(logz.Controller(metaobj)).Sugar().
-			Infof("Enqueuing controller object because controlled object was %s", addUpdateDelete)
+		logger.Sugar().Infof("Enqueuing looked up object '%s' because controlled object was %s",
+			obj.GetNamespace(), obj.GetName(), addUpdateDelete)
 		e.WorkQueue.Add(QueueKey{
 			Namespace: metaobj.GetNamespace(),
 			Name:      metaobj.GetName(),
@@ -63,6 +65,7 @@ func (e *LookupHandler) OnDelete(obj interface{}) {
 
 // loggerForObj returns a logger with fields for a controlled object.
 func (e *LookupHandler) loggerForObj(obj meta_v1.Object) *zap.Logger {
-	return e.Logger.With(logz.Namespace(obj), logz.Object(obj),
-		logz.ObjectGk(obj.(runtime.Object).GetObjectKind().GroupVersionKind().GroupKind()))
+	return e.Logger.With(logz.Namespace(obj),
+		logz.Object(obj),
+		logz.ObjectGk(e.Gvk.GroupKind()))
 }

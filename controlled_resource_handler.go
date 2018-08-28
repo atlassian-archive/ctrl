@@ -33,6 +33,7 @@ type ControlledResourceHandler struct {
 	WorkQueue       WorkQueueProducer
 	ControllerIndex ControllerIndex
 	ControllerGvk   schema.GroupVersionKind
+	Gvk             schema.GroupVersionKind
 }
 
 func (g *ControlledResourceHandler) enqueueMapped(metaObj meta_v1.Object, action string) {
@@ -96,11 +97,10 @@ func (g *ControlledResourceHandler) OnDelete(obj interface{}) {
 // This method may be called with an empty controllerName.
 func (g *ControlledResourceHandler) rebuildControllerByName(logger *zap.Logger, namespace, controllerName, addUpdateDelete string) {
 	if controllerName == "" {
+		logger.Info("Object has no controller, so nothing was enqueued")
 		return
 	}
-	logger.
-		With(logz.ControllerName(controllerName)).
-		Sugar().Infof("Enqueuing controller object because controlled object was %s", addUpdateDelete)
+	logger.Sugar().Infof("Enqueuing controller object %q because controlled object was %s", controllerName, addUpdateDelete)
 	g.WorkQueue.Add(QueueKey{
 		Namespace: namespace,
 		Name:      controllerName,
@@ -120,6 +120,7 @@ func (g *ControlledResourceHandler) getControllerNameAndNamespace(obj meta_v1.Ob
 
 // loggerForObj returns a logger with fields for a controlled object.
 func (g *ControlledResourceHandler) loggerForObj(obj meta_v1.Object) *zap.Logger {
-	return g.Logger.With(logz.Namespace(obj), logz.Object(obj),
-		logz.ObjectGk(obj.(runtime.Object).GetObjectKind().GroupVersionKind().GroupKind()))
+	return g.Logger.With(logz.Namespace(obj),
+		logz.Object(obj),
+		logz.ObjectGk(g.Gvk.GroupKind()))
 }
