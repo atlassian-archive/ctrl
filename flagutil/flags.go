@@ -35,6 +35,7 @@ type boolFlag interface {
 	IsBoolFlag() bool
 }
 
+// nolint: gocyclo
 func (v *flagValidator) validateNextFlag() (bool, error) {
 	if len(v.args) == 0 {
 		return false, nil

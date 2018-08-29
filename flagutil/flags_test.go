@@ -3,6 +3,8 @@ package flagutil
 import (
 	"flag"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateFlags(t *testing.T) {
@@ -20,12 +22,12 @@ func TestValidateFlags(t *testing.T) {
 		error string
 	}{
 		{
-			name:  "valid inline boolean",
+			name:  "inline boolean",
 			args:  []string{"-f=true", "-s", "string"},
 			valid: true,
 		},
 		{
-			name:  "valid boolean with no value",
+			name:  "boolean with no value",
 			args:  []string{"-f", "-s", "string"},
 			valid: true,
 		},
@@ -35,7 +37,7 @@ func TestValidateFlags(t *testing.T) {
 			valid: true,
 		},
 		{
-			name:  "valid double dashes",
+			name:  "double dashes",
 			args:  []string{"--f=true", "--s", "string"},
 			valid: true,
 		},
@@ -66,6 +68,7 @@ func TestValidateFlags(t *testing.T) {
 	}
 
 	for _, c := range cases {
+		c := c
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -76,16 +79,10 @@ func TestValidateFlags(t *testing.T) {
 
 			err := ValidateFlags(fs, c.args)
 			if c.valid {
-				if err != nil {
-					t.Fatalf("unexpected error: %#v", err)
-				}
+				require.NoError(t, err, "unexpected error: %#v", err)
 			} else {
-				if err == nil {
-					t.Fatal("expected validation error to be returned")
-				}
-				if err.Error() != c.error {
-					t.Fatalf("expected error: %q, but got: %q", c.error, err.Error())
-				}
+				require.Error(t, err, "expected validation error to be returned")
+				require.Equal(t, c.error, err.Error(), "expected error: %q, but got: %q", c.error, err.Error())
 			}
 		})
 	}
