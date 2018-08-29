@@ -248,7 +248,7 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 		"of a leadership. This is only applicable if leader election is enabled")
 	flagset.StringVar(&a.LeaderElectionConfig.ConfigMapNamespace, "leader-elect-configmap-namespace", meta_v1.NamespaceDefault,
 		"Namespace to use for leader election ConfigMap. This is only applicable if leader election is enabled")
-	flagset.StringVar(&a.LeaderElectionConfig.ConfigMapName, "leader-elect-configmap-name", name+"-leader-elect",
+	flagset.StringVar(&a.LeaderElectionConfig.ConfigMapName, "leader-elect-configmap-name", name+":leader-elect",
 		"ConfigMap name to use for leader election. This is only applicable if leader election is enabled")
 	configFileFrom := flagset.String("client-config-from", "in-cluster",
 		"Source of REST client configuration. 'in-cluster' (default), 'environment' and 'file' are valid options.")
