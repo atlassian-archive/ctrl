@@ -64,7 +64,7 @@ type App struct {
 	Namespace            string
 	Controllers          []ctrl.Constructor
 	Workers              int
-	LeaderElectionConfig LeaderElectionConfig
+	LeaderElectionConfig *LeaderElectionConfig
 	AuxListenOn          string
 	Debug                bool
 }
@@ -213,8 +213,9 @@ func CancelOnInterrupt(ctx context.Context, f context.CancelFunc) {
 
 func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.FlagSet, arguments []string) (*App, error) {
 	a := App{
-		Name:        name,
-		Controllers: controllers,
+		Name:                 name,
+		Controllers:          controllers,
+		LeaderElectionConfig: &LeaderElectionConfig{},
 	}
 	for _, cntrlr := range controllers {
 		cntrlr.AddFlags(flagset)
