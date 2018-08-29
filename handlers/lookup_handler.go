@@ -1,6 +1,7 @@
-package ctrl
+package handlers
 
 import (
+	"github.com/atlassian/ctrl"
 	"github.com/atlassian/ctrl/logz"
 	"go.uber.org/zap"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,7 +15,7 @@ import (
 // This handler assumes that the Logger already has the ctrl_gk field set.
 type LookupHandler struct {
 	Logger    *zap.Logger
-	WorkQueue WorkQueueProducer
+	WorkQueue ctrl.WorkQueueProducer
 	Gvk       schema.GroupVersionKind
 
 	Lookup func(runtime.Object) ([]runtime.Object, error)
@@ -33,7 +34,7 @@ func (e *LookupHandler) enqueueMapped(logger *zap.Logger, obj meta_v1.Object) {
 	for _, o := range objs {
 		metaobj := o.(meta_v1.Object)
 		logger.Sugar().Infof("Enqueuing looked up object '%s/%s'", obj.GetNamespace(), obj.GetName())
-		e.WorkQueue.Add(QueueKey{
+		e.WorkQueue.Add(ctrl.QueueKey{
 			Namespace: metaobj.GetNamespace(),
 			Name:      metaobj.GetName(),
 		})
@@ -41,18 +42,18 @@ func (e *LookupHandler) enqueueMapped(logger *zap.Logger, obj meta_v1.Object) {
 }
 
 func (e *LookupHandler) OnAdd(obj interface{}) {
-	logger := e.Logger.With(logz.Operation("added"))
+	logger := e.Logger.With(logz.Operation(ctrl.AddedOperation))
 	e.enqueueMapped(logger, obj.(meta_v1.Object))
 }
 
 func (e *LookupHandler) OnUpdate(oldObj, newObj interface{}) {
-	logger := e.Logger.With(logz.Operation("updated"))
+	logger := e.Logger.With(logz.Operation(ctrl.UpdatedOperation))
 	e.enqueueMapped(logger, newObj.(meta_v1.Object))
 }
 
 func (e *LookupHandler) OnDelete(obj interface{}) {
 	metaObj, ok := obj.(meta_v1.Object)
-	logger := e.Logger.With(logz.Operation("deleted"))
+	logger := e.Logger.With(logz.Operation(ctrl.DeletedOperation))
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {

@@ -1,10 +1,11 @@
-package ctrl
+package process
 
 import (
 	"strconv"
 	"sync/atomic"
 	"time"
 
+	"github.com/atlassian/ctrl"
 	"github.com/atlassian/ctrl/logz"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -87,7 +88,7 @@ func (g *Generic) processKey(logger *zap.Logger, holder Holder, key gvkQueueKey)
 		logger.Sugar().Infof("Synced in %v%s", totalTime, msg)
 	}()
 
-	retriable, err := cntrlr.Process(&ProcessContext{
+	retriable, err := cntrlr.Process(&ctrl.ProcessContext{
 		Logger: logger,
 		Object: obj,
 	})

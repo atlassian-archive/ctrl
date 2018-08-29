@@ -3,6 +3,7 @@ package logz
 import (
 	"os"
 
+	"github.com/atlassian/ctrl"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,8 +36,8 @@ func ObjectGk(gk schema.GroupKind) zapcore.Field {
 
 // Operation is a zap field used in ResourceEventHandler to identify the operation
 // that the logs are being produced from.
-func Operation(operation string) zapcore.Field {
-	return zap.String("operation", operation)
+func Operation(operation ctrl.Operation) zapcore.Field {
+	return zap.Stringer("operation", operation)
 }
 
 func Namespace(obj meta_v1.Object) zapcore.Field {

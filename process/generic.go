@@ -1,4 +1,4 @@
-package ctrl
+package process
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/ash2k/stager"
+	"github.com/atlassian/ctrl"
+	"github.com/atlassian/ctrl/handlers"
 	"github.com/atlassian/ctrl/logz"
 	chimw "github.com/go-chi/chi/middleware"
 	"github.com/pkg/errors"
@@ -35,9 +37,9 @@ type Generic struct {
 	Informers   map[schema.GroupVersionKind]cache.SharedIndexInformer
 }
 
-func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers int, constructors ...Constructor) (*Generic, error) {
-	controllers := make(map[schema.GroupVersionKind]Interface)
-	servers := make(map[schema.GroupVersionKind]Server)
+func NewGeneric(config *ctrl.Config, queue workqueue.RateLimitingInterface, workers int, constructors ...ctrl.Constructor) (*Generic, error) {
+	controllers := make(map[schema.GroupVersionKind]ctrl.Interface)
+	servers := make(map[schema.GroupVersionKind]ctrl.Server)
 	holders := make(map[schema.GroupVersionKind]Holder)
 	informers := make(map[schema.GroupVersionKind]cache.SharedIndexInformer)
 	serverHolders := make(map[schema.GroupVersionKind]ServerHolder)
@@ -69,7 +71,7 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 
 		constructed, err := constr.New(
 			constructorConfig,
-			&Context{
+			&ctrl.Context{
 				ReadyForWork: func() {
 					close(readyForWork)
 				},
@@ -95,7 +97,7 @@ func NewGeneric(config *Config, queue workqueue.RateLimitingInterface, workers i
 			if !ok {
 				return nil, errors.Errorf("controller for GVK %s should have registered an informer for that GVK", descr.Gvk)
 			}
-			inf.AddEventHandler(&GenericHandler{
+			inf.AddEventHandler(&handlers.GenericHandler{
 				Logger:    controllerLogger,
 				WorkQueue: queueGvk,
 				Gvk:       descr.Gvk,
@@ -244,7 +246,7 @@ func addMetricsMiddleware(requestTime *prometheus.HistogramVec, controller, grou
 
 type Holder struct {
 	AppName             string
-	Cntrlr              Interface
+	Cntrlr              ctrl.Interface
 	ReadyForWork        <-chan struct{}
 	objectProcessTime   *prometheus.HistogramVec
 	objectProcessErrors *prometheus.CounterVec
@@ -252,7 +254,7 @@ type Holder struct {
 
 type ServerHolder struct {
 	AppName      string
-	Server       Server
+	Server       ctrl.Server
 	ReadyForWork <-chan struct{}
 	requestTime  *prometheus.HistogramVec
 }

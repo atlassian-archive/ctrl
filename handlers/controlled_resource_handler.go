@@ -1,18 +1,13 @@
-package ctrl
+package handlers
 
 import (
+	"github.com/atlassian/ctrl"
 	"github.com/atlassian/ctrl/logz"
 	"go.uber.org/zap"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
-)
-
-const (
-	updatedAction = "updated"
-	deletedAction = "deleted"
-	addedAction   = "added"
 )
 
 // ControllerIndex is an index from controlled to controller objects.
@@ -30,7 +25,7 @@ type ControllerIndex interface {
 // - controlled and controller objects exist in the same namespace and never across namespaces.
 type ControlledResourceHandler struct {
 	Logger          *zap.Logger
-	WorkQueue       WorkQueueProducer
+	WorkQueue       ctrl.WorkQueueProducer
 	ControllerIndex ControllerIndex
 	ControllerGvk   schema.GroupVersionKind
 	Gvk             schema.GroupVersionKind
@@ -60,14 +55,14 @@ func (g *ControlledResourceHandler) enqueueMapped(logger *zap.Logger, metaObj me
 
 func (g *ControlledResourceHandler) OnAdd(obj interface{}) {
 	metaObj := obj.(meta_v1.Object)
-	logger := g.Logger.With(logz.Operation(addedAction))
+	logger := g.Logger.With(logz.Operation(ctrl.AddedOperation))
 	g.enqueueMapped(logger, metaObj)
 }
 
 func (g *ControlledResourceHandler) OnUpdate(oldObj, newObj interface{}) {
 	oldMeta := oldObj.(meta_v1.Object)
 	newMeta := newObj.(meta_v1.Object)
-	logger := g.Logger.With(logz.Operation(updatedAction))
+	logger := g.Logger.With(logz.Operation(ctrl.UpdatedOperation))
 
 	oldName, _ := g.getControllerNameAndNamespace(oldMeta)
 	newName, _ := g.getControllerNameAndNamespace(newMeta)
@@ -81,7 +76,7 @@ func (g *ControlledResourceHandler) OnUpdate(oldObj, newObj interface{}) {
 
 func (g *ControlledResourceHandler) OnDelete(obj interface{}) {
 	metaObj, ok := obj.(meta_v1.Object)
-	logger := g.Logger.With(logz.Operation(deletedAction))
+	logger := g.Logger.With(logz.Operation(ctrl.DeletedOperation))
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
@@ -104,7 +99,7 @@ func (g *ControlledResourceHandler) rebuildControllerByName(logger *zap.Logger, 
 		return
 	}
 	logger.Sugar().Infof("Enqueuing controller object %q", controllerName)
-	g.WorkQueue.Add(QueueKey{
+	g.WorkQueue.Add(ctrl.QueueKey{
 		Namespace: namespace,
 		Name:      controllerName,
 	})

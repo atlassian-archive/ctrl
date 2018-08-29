@@ -6,7 +6,7 @@ import (
 	"net/http/pprof"
 	"time"
 
-	"github.com/atlassian/ctrl"
+	"github.com/atlassian/ctrl/process"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/prometheus/client_golang/prometheus"
@@ -43,7 +43,7 @@ func (a *AuxServer) Run(ctx context.Context) error {
 		ReadTimeout:  readTimeout,
 		IdleTimeout:  idleTimeout,
 	}
-	return ctrl.StartStopServer(ctx, srv, shutdownTimeout)
+	return process.StartStopServer(ctx, srv, shutdownTimeout)
 }
 
 func (a *AuxServer) constructHandler() *chi.Mux {

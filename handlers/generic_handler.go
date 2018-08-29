@@ -1,6 +1,7 @@
-package ctrl
+package handlers
 
 import (
+	"github.com/atlassian/ctrl"
 	"github.com/atlassian/ctrl/logz"
 	"go.uber.org/zap"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,7 +12,7 @@ import (
 // This handler assumes that the Logger already has the obj_gk/ctrl_gk field set.
 type GenericHandler struct {
 	Logger    *zap.Logger
-	WorkQueue WorkQueueProducer
+	WorkQueue ctrl.WorkQueueProducer
 
 	Gvk schema.GroupVersionKind
 }
@@ -46,7 +47,7 @@ func (g *GenericHandler) OnDelete(obj interface{}) {
 
 func (g *GenericHandler) add(logger *zap.Logger, obj meta_v1.Object) {
 	g.loggerForObj(logger, obj).Info("Enqueuing object")
-	g.WorkQueue.Add(QueueKey{
+	g.WorkQueue.Add(ctrl.QueueKey{
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	})

@@ -12,6 +12,7 @@ import (
 	"github.com/atlassian/ctrl"
 	"github.com/atlassian/ctrl/client"
 	"github.com/atlassian/ctrl/logz"
+	"github.com/atlassian/ctrl/process"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 	core_v1 "k8s.io/api/core/v1"
@@ -84,7 +85,7 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 		RestConfig: a.RestConfig,
 		MainClient: a.MainClient,
 	}
-	generic, err := ctrl.NewGeneric(config,
+	generic, err := process.NewGeneric(config,
 		workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multiqueue"),
 		a.Workers, a.Controllers...)
 	if err != nil {

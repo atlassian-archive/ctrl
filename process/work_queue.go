@@ -1,16 +1,17 @@
-package ctrl
+package process
 
 import (
 	"fmt"
 	"time"
 
+	"github.com/atlassian/ctrl"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/workqueue"
 )
 
 type gvkQueueKey struct {
 	gvk schema.GroupVersionKind
-	QueueKey
+	ctrl.QueueKey
 }
 
 func (g *gvkQueueKey) String() string {
@@ -66,7 +67,7 @@ type gvkQueue struct {
 	workDeduplicationPeriod time.Duration
 }
 
-func (q *gvkQueue) Add(item QueueKey) {
+func (q *gvkQueue) Add(item ctrl.QueueKey) {
 	q.queue.AddAfter(gvkQueueKey{
 		gvk:      q.gvk,
 		QueueKey: item,
