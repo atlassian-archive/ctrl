@@ -33,7 +33,10 @@ func (e *LookupHandler) enqueueMapped(logger *zap.Logger, obj meta_v1.Object) {
 	}
 	for _, o := range objs {
 		metaobj := o.(meta_v1.Object)
-		logger.Sugar().Infof("Enqueuing looked up object '%s/%s'", obj.GetNamespace(), obj.GetName())
+		logger.
+			With(logz.DelegateName(obj.GetName())).
+			With(logz.DelegateGk(e.Gvk.GroupKind())).
+			Info("Enqueuing looked up object")
 		e.WorkQueue.Add(ctrl.QueueKey{
 			Namespace: metaobj.GetNamespace(),
 			Name:      metaobj.GetName(),
