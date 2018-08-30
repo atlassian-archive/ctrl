@@ -35,6 +35,8 @@ type boolFlag interface {
 	IsBoolFlag() bool
 }
 
+// This method is based on the parseOne() method from https://golang.org/src/flag/flag.go,
+// but was rewritten for extra validation rather than parsing flag values.
 // nolint: gocyclo
 func (v *flagValidator) validateNextFlag() (bool, error) {
 	if len(v.args) == 0 {
