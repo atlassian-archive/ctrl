@@ -11,6 +11,7 @@ import (
 	"github.com/ash2k/stager"
 	"github.com/atlassian/ctrl"
 	"github.com/atlassian/ctrl/client"
+	"github.com/atlassian/ctrl/flagutil"
 	"github.com/atlassian/ctrl/logz"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -64,7 +65,7 @@ type App struct {
 	Namespace            string
 	Controllers          []ctrl.Constructor
 	Workers              int
-	LeaderElectionConfig *LeaderElectionConfig
+	LeaderElectionConfig LeaderElectionConfig
 	AuxListenOn          string
 	Debug                bool
 }
@@ -213,9 +214,8 @@ func CancelOnInterrupt(ctx context.Context, f context.CancelFunc) {
 
 func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.FlagSet, arguments []string) (*App, error) {
 	a := App{
-		Name:                 name,
-		Controllers:          controllers,
-		LeaderElectionConfig: &LeaderElectionConfig{},
+		Name:        name,
+		Controllers: controllers,
 	}
 	for _, cntrlr := range controllers {
 		cntrlr.AddFlags(flagset)
@@ -248,7 +248,7 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 		"of a leadership. This is only applicable if leader election is enabled")
 	flagset.StringVar(&a.LeaderElectionConfig.ConfigMapNamespace, "leader-elect-configmap-namespace", meta_v1.NamespaceDefault,
 		"Namespace to use for leader election ConfigMap. This is only applicable if leader election is enabled")
-	flagset.StringVar(&a.LeaderElectionConfig.ConfigMapName, "leader-elect-configmap-name", name+":leader-elect",
+	flagset.StringVar(&a.LeaderElectionConfig.ConfigMapName, "leader-elect-configmap-name", name+"-leader-elect",
 		"ConfigMap name to use for leader election. This is only applicable if leader election is enabled")
 	configFileFrom := flagset.String("client-config-from", "in-cluster",
 		"Source of REST client configuration. 'in-cluster' (default), 'environment' and 'file' are valid options.")
@@ -258,6 +258,10 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 		"Context to use for REST client configuration. This is only applicable if --client-config-from=file is set.")
 	logEncoding := flagset.String("log-encoding", "json", `Sets the logger's encoding. Valid values are "json" and "console".`)
 	loggingLevel := flagset.String("log-level", "info", `Sets the logger's output level.`)
+
+	if err := flagutil.ValidateFlags(flagset, arguments); err != nil {
+		return nil, err
+	}
 
 	if err := flagset.Parse(arguments); err != nil {
 		return nil, err
