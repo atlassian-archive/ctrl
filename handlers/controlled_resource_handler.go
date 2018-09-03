@@ -119,7 +119,6 @@ func (g *ControlledResourceHandler) getControllerNameAndNamespace(obj meta_v1.Ob
 	return name, obj.GetNamespace()
 }
 
-// loggerForObj returns a logger with fields for a controlled object.
 func (g *ControlledResourceHandler) loggerForObj(logger *zap.Logger, obj meta_v1.Object) *zap.Logger {
 	return logger.With(logz.Namespace(obj),
 		logz.Object(obj),
