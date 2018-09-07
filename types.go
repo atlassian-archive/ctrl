@@ -16,9 +16,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// ZapNameField is a function that can be used to obtain structured logging field for an object's name.
-type ZapNameField func(name string) zap.Field
-
 type Descriptor struct {
 	// Group Version Kind of objects a controller can process.
 	Gvk schema.GroupVersionKind
@@ -73,6 +70,18 @@ type Config struct {
 
 	RestConfig *rest.Config
 	MainClient kubernetes.Interface
+}
+
+type Operation string
+
+const (
+	UpdatedOperation Operation = "updated"
+	DeletedOperation Operation = "deleted"
+	AddedOperation   Operation = "added"
+)
+
+func (o Operation) String() string {
+	return string(o)
 }
 
 type Context struct {

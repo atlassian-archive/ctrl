@@ -1,10 +1,11 @@
-package ctrl
+package process
 
 import (
 	"strconv"
 	"sync/atomic"
 	"time"
 
+	"github.com/atlassian/ctrl"
 	"github.com/atlassian/ctrl/logz"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -38,7 +39,10 @@ func (g *Generic) processNextWorkItem() bool {
 
 	holder := g.Controllers[key.gvk]
 	logger := g.logger.With(logz.NamespaceName(key.Namespace),
-		logz.ControllerName(key.Name), logz.Iteration(atomic.AddUint32(&g.iter, 1)))
+		logz.ControllerGk(key.gvk.GroupKind()),
+		logz.ObjectName(key.Name),
+		logz.ObjectGk(key.gvk.GroupKind()),
+		logz.Iteration(atomic.AddUint32(&g.iter, 1)))
 
 	retriable, err := g.processKey(logger, holder, key)
 	g.handleErr(logger, retriable, err, key)
@@ -84,7 +88,7 @@ func (g *Generic) processKey(logger *zap.Logger, holder Holder, key gvkQueueKey)
 		logger.Sugar().Infof("Synced in %v%s", totalTime, msg)
 	}()
 
-	retriable, err := cntrlr.Process(&ProcessContext{
+	retriable, err := cntrlr.Process(&ctrl.ProcessContext{
 		Logger: logger,
 		Object: obj,
 	})

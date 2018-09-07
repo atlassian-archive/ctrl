@@ -1,18 +1,13 @@
-package ctrl
+package handlers
 
 import (
+	"github.com/atlassian/ctrl"
 	"github.com/atlassian/ctrl/logz"
 	"go.uber.org/zap"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
-)
-
-const (
-	updatedAction = "updated"
-	deletedAction = "deleted"
-	addedAction   = "added"
 )
 
 // ControllerIndex is an index from controlled to controller objects.
@@ -30,14 +25,15 @@ type ControllerIndex interface {
 // - controlled and controller objects exist in the same namespace and never across namespaces.
 type ControlledResourceHandler struct {
 	Logger          *zap.Logger
-	WorkQueue       WorkQueueProducer
+	WorkQueue       ctrl.WorkQueueProducer
 	ControllerIndex ControllerIndex
 	ControllerGvk   schema.GroupVersionKind
+	Gvk             schema.GroupVersionKind
 }
 
-func (g *ControlledResourceHandler) enqueueMapped(metaObj meta_v1.Object, action string) {
+func (g *ControlledResourceHandler) enqueueMapped(logger *zap.Logger, metaObj meta_v1.Object) {
 	name, namespace := g.getControllerNameAndNamespace(metaObj)
-	logger := g.loggerForObj(metaObj)
+	logger = g.loggerForObj(logger, metaObj)
 
 	if name == "" {
 		if g.ControllerIndex != nil {
@@ -49,59 +45,64 @@ func (g *ControlledResourceHandler) enqueueMapped(metaObj meta_v1.Object, action
 			}
 			for _, controller := range controllers {
 				controllerMeta := controller.(meta_v1.Object)
-				g.rebuildControllerByName(logger, controllerMeta.GetNamespace(), controllerMeta.GetName(), action)
+				g.rebuildControllerByName(logger, controllerMeta.GetNamespace(), controllerMeta.GetName())
 			}
 		}
 	} else {
-		g.rebuildControllerByName(logger, namespace, name, action)
+		g.rebuildControllerByName(logger, namespace, name)
 	}
 }
 
 func (g *ControlledResourceHandler) OnAdd(obj interface{}) {
 	metaObj := obj.(meta_v1.Object)
-	g.enqueueMapped(metaObj, addedAction)
+	logger := g.Logger.With(logz.Operation(ctrl.AddedOperation))
+	g.enqueueMapped(logger, metaObj)
 }
 
 func (g *ControlledResourceHandler) OnUpdate(oldObj, newObj interface{}) {
 	oldMeta := oldObj.(meta_v1.Object)
 	newMeta := newObj.(meta_v1.Object)
+	logger := g.Logger.With(logz.Operation(ctrl.UpdatedOperation))
 
 	oldName, _ := g.getControllerNameAndNamespace(oldMeta)
 	newName, _ := g.getControllerNameAndNamespace(newMeta)
 
 	if oldName != newName {
-		g.enqueueMapped(oldMeta, updatedAction)
+		g.enqueueMapped(logger, oldMeta)
 	}
 
-	g.enqueueMapped(newMeta, updatedAction)
+	g.enqueueMapped(logger, newMeta)
 }
 
 func (g *ControlledResourceHandler) OnDelete(obj interface{}) {
 	metaObj, ok := obj.(meta_v1.Object)
+	logger := g.Logger.With(logz.Operation(ctrl.DeletedOperation))
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			g.Logger.Sugar().Errorf("Delete event with unrecognized object type: %T", obj)
+			logger.Sugar().Errorf("Delete event with unrecognized object type: %T", obj)
 			return
 		}
 		metaObj, ok = tombstone.Obj.(meta_v1.Object)
 		if !ok {
-			g.Logger.Sugar().Errorf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
+			logger.Sugar().Errorf("Delete tombstone with unrecognized object type: %T", tombstone.Obj)
 			return
 		}
 	}
-	g.enqueueMapped(metaObj, deletedAction)
+	g.enqueueMapped(logger, metaObj)
 }
 
 // This method may be called with an empty controllerName.
-func (g *ControlledResourceHandler) rebuildControllerByName(logger *zap.Logger, namespace, controllerName, addUpdateDelete string) {
+func (g *ControlledResourceHandler) rebuildControllerByName(logger *zap.Logger, namespace, controllerName string) {
 	if controllerName == "" {
+		logger.Debug("Object has no controller, so nothing was enqueued")
 		return
 	}
 	logger.
-		With(logz.ControllerName(controllerName)).
-		Sugar().Infof("Enqueuing controller object because controlled object was %s", addUpdateDelete)
-	g.WorkQueue.Add(QueueKey{
+		With(logz.DelegateName(controllerName)).
+		With(logz.DelegateGk(g.ControllerGvk.GroupKind())).
+		Info("Enqueuing controller")
+	g.WorkQueue.Add(ctrl.QueueKey{
 		Namespace: namespace,
 		Name:      controllerName,
 	})
@@ -118,8 +119,8 @@ func (g *ControlledResourceHandler) getControllerNameAndNamespace(obj meta_v1.Ob
 	return name, obj.GetNamespace()
 }
 
-// loggerForObj returns a logger with fields for a controlled object.
-func (g *ControlledResourceHandler) loggerForObj(obj meta_v1.Object) *zap.Logger {
-	return g.Logger.With(logz.Namespace(obj), logz.Object(obj),
-		logz.ObjectGk(obj.(runtime.Object).GetObjectKind().GroupVersionKind().GroupKind()))
+func (g *ControlledResourceHandler) loggerForObj(logger *zap.Logger, obj meta_v1.Object) *zap.Logger {
+	return logger.With(logz.Namespace(obj),
+		logz.Object(obj),
+		logz.ObjectGk(g.Gvk.GroupKind()))
 }
