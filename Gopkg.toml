@@ -35,3 +35,7 @@
 [[override]]
   name = "k8s.io/api"
   branch = "release-1.10" # correct branch
+
+[[constraint]]
+  branch = "master" # I want the latest commit from this branch, not just the latest tag or the version used by client-go.
+  name = "github.com/stretchr/testify"

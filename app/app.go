@@ -11,6 +11,7 @@ import (
 	"github.com/ash2k/stager"
 	"github.com/atlassian/ctrl"
 	"github.com/atlassian/ctrl/client"
+	"github.com/atlassian/ctrl/flagutil"
 	"github.com/atlassian/ctrl/logz"
 	"github.com/atlassian/ctrl/process"
 	"github.com/prometheus/client_golang/prometheus"
@@ -258,6 +259,10 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 		"Context to use for REST client configuration. This is only applicable if --client-config-from=file is set.")
 	logEncoding := flagset.String("log-encoding", "json", `Sets the logger's encoding. Valid values are "json" and "console".`)
 	loggingLevel := flagset.String("log-level", "info", `Sets the logger's output level.`)
+
+	if err := flagutil.ValidateFlags(flagset, arguments); err != nil {
+		return nil, err
+	}
 
 	if err := flagset.Parse(arguments); err != nil {
 		return nil, err
