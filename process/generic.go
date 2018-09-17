@@ -140,9 +140,10 @@ func NewGeneric(config *ctrl.Config, queue workqueue.RateLimitingInterface, work
 			servers[descr.Gvk] = constructed.Server
 
 			serverHolders[descr.Gvk] = ServerHolder{
-				AppName:     config.AppName,
-				Server:      constructed.Server,
-				requestTime: requestTime,
+				AppName:      config.AppName,
+				Server:       constructed.Server,
+				ReadyForWork: readyForWork,
+				requestTime:  requestTime,
 			}
 
 			allMetrics = append(allMetrics, requestTime)
@@ -229,6 +230,24 @@ func (g *Generic) Run(ctx context.Context) error {
 		})
 	}
 	return group.Wait()
+}
+
+func (g *Generic) IsReady() bool {
+	for _, holder := range g.Controllers {
+		select {
+		case <-holder.ReadyForWork:
+		default:
+			return false
+		}
+	}
+	for _, holder := range g.Servers {
+		select {
+		case <-holder.ReadyForWork:
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func addMetricsMiddleware(requestTime *prometheus.HistogramVec, controller, groupKind string) func(http.Handler) http.Handler {

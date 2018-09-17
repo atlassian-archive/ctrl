@@ -102,6 +102,7 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 		Logger:   a.Logger,
 		Addr:     a.AuxListenOn,
 		Gatherer: a.PrometheusRegistry,
+		IsReady:  generic.IsReady,
 		Debug:    a.Debug,
 	}
 
