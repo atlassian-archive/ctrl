@@ -29,6 +29,7 @@ type AuxServer struct {
 	Addr     string // TCP address to listen on, ":http" if empty
 	Gatherer prometheus.Gatherer
 	Debug    bool
+	ready    bool // Readiness handler for Kubernetes
 }
 
 func (a *AuxServer) Run(ctx context.Context) error {
@@ -53,6 +54,13 @@ func (a *AuxServer) constructHandler() *chi.Mux {
 
 	router.Method(http.MethodGet, "/metrics", promhttp.HandlerFor(a.Gatherer, promhttp.HandlerOpts{}))
 	router.Get("/healthz/ping", func(_ http.ResponseWriter, _ *http.Request) {})
+	router.Get("/healthz/ready", func(w http.ResponseWriter, _ *http.Request) {
+		if !a.ready {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
 
 	if a.Debug {
 		// Enable debug endpoints
@@ -75,4 +83,14 @@ func (a *AuxServer) setServerHeader(next http.Handler) http.Handler {
 
 func pageNotFound(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
+}
+
+// Ready marks the server as ready to handle traffic
+func (a *AuxServer) Ready() {
+	a.ready = true
+}
+
+// NotReady marks the server as not ready to handle traffic
+func (a *AuxServer) NotReady() {
+	a.ready = false
 }
