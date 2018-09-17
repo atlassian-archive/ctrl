@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/pprof"
 	"time"
@@ -28,6 +29,7 @@ type AuxServer struct {
 	Name     string
 	Addr     string // TCP address to listen on, ":http" if empty
 	Gatherer prometheus.Gatherer
+	IsReady  func() bool
 	Debug    bool
 }
 
@@ -53,7 +55,14 @@ func (a *AuxServer) constructHandler() *chi.Mux {
 
 	router.Method(http.MethodGet, "/metrics", promhttp.HandlerFor(a.Gatherer, promhttp.HandlerOpts{}))
 	router.Get("/healthz/ping", func(_ http.ResponseWriter, _ *http.Request) {})
-
+	router.Get("/healthz/ready", func(w http.ResponseWriter, _ *http.Request) {
+		if !a.IsReady() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			io.WriteString(w, "Not ready") // nolint: errcheck, gosec
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
 	if a.Debug {
 		// Enable debug endpoints
 		router.HandleFunc("/debug/pprof/", pprof.Index)
