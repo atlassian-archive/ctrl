@@ -44,7 +44,7 @@ func NewGeneric(config *ctrl.Config, queue workqueue.RateLimitingInterface, work
 	informers := make(map[schema.GroupVersionKind]cache.SharedIndexInformer)
 	serverHolders := make(map[schema.GroupVersionKind]ServerHolder)
 	wq := workQueue{
-		queue: queue,
+		queue:                   queue,
 		workDeduplicationPeriod: workDeduplicationPeriod,
 	}
 	for _, constr := range constructors {
@@ -165,7 +165,7 @@ func NewGeneric(config *ctrl.Config, queue workqueue.RateLimitingInterface, work
 	}, nil
 }
 
-func (g *Generic) Run(ctx context.Context) error {
+func (g *Generic) Run(ctx context.Context, ready func()) error {
 	// Stager will perform ordered, graceful shutdown
 	stgr := stager.New()
 	defer stgr.Shutdown()
@@ -216,6 +216,9 @@ func (g *Generic) Run(ctx context.Context) error {
 	}
 
 	if len(g.Servers) == 0 {
+		if ready != nil {
+			ready()
+		}
 		<-ctx.Done()
 		return ctx.Err()
 	}
@@ -227,6 +230,9 @@ func (g *Generic) Run(ctx context.Context) error {
 		group.Go(func() error {
 			return server.Run(ctx)
 		})
+	}
+	if ready != nil {
+		ready()
 	}
 	return group.Wait()
 }
