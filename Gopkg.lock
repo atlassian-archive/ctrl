@@ -90,6 +90,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:05f95ffdfcf651bdb0f05b40b69e7f5663047f8da75c72d58728acb59b5cc107"
+  name = "github.com/google/btree"
+  packages = ["."]
+  pruneopts = "NT"
+  revision = "4030bb1f1f0c35b30ca7009e9ebd06849dd45306"
+
+[[projects]]
+  branch = "master"
   digest = "1:52c5834e2bebac9030c97cc0798ac11c3aa8a39f098aeb419f142533da6cd3cc"
   name = "github.com/google/gofuzz"
   packages = ["."]
@@ -110,6 +118,17 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:2a2caa63899dae26ed3e4510b806549fd416d94db24ad68279daa62881b26488"
+  name = "github.com/gregjones/httpcache"
+  packages = [
+    ".",
+    "diskcache",
+  ]
+  pruneopts = "NT"
+  revision = "9cad4c3443a7200dd6400aef47183728de563a38"
+
+[[projects]]
+  branch = "master"
   digest = "1:13e2fa5735a82a5fb044f290cfd0dba633d1c5e516b27da0509e0dbb3515a18e"
   name = "github.com/hashicorp/golang-lru"
   packages = [
@@ -120,14 +139,6 @@
   revision = "0fb14efe8c47ae851c0034ed7a448854d3d34cf3"
 
 [[projects]]
-  branch = "master"
-  digest = "1:b7f860847a1d71f925ba9385ed95f1ebc0abfeb418a78e219ab61f48fdfeffad"
-  name = "github.com/howeyc/gopass"
-  packages = ["."]
-  pruneopts = "NT"
-  revision = "bf9dde6d0d2c004a008c27aaee91170c786f6db8"
-
-[[projects]]
   digest = "1:f0818bc212054788d1086e015b5ba32d01ef8e12c615bbb625570eefbe684a1e"
   name = "github.com/imdario/mergo"
   packages = ["."]
@@ -136,12 +147,11 @@
   version = "v0.3.4"
 
 [[projects]]
-  digest = "1:ff7402582aa92cc500954f91ef769e4c3bd808afb699422b89524e6317735260"
+  digest = "1:3f2853091a9e2f889797d69385c873920bd56d86e1ef3f2470f95e85f7fb4b9e"
   name = "github.com/json-iterator/go"
   packages = ["."]
   pruneopts = "NT"
-  revision = "ca39e5af3ece67bbcda3d0f4f56a8e24d9f2dad4"
-  version = "1.1.3"
+  revision = "f2b4162afba35581b6d4a50d3b8f34e33c144682"
 
 [[projects]]
   digest = "1:a48f56ed57da3011d23a1cc660820344f3d7f9607efafb532a5105765b0ec08b"
@@ -166,6 +176,22 @@
   pruneopts = "NT"
   revision = "1df9eeb2bb81f327b96228865c5687bc2194af3f"
   version = "1.0.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:bf2ac97824a7221eb16b096aecc1c390d4c8a4e49524386aaa2e2dd215cbfb31"
+  name = "github.com/petar/GoLLRB"
+  packages = ["llrb"]
+  pruneopts = "NT"
+  revision = "53be0d36a84c2a886ca057d34b6aa4468df9ccb4"
+
+[[projects]]
+  digest = "1:e4e9e026b8e4c5630205cd0208efb491b40ad40552e57f7a646bb8a46896077b"
+  name = "github.com/peterbourgon/diskv"
+  packages = ["."]
+  pruneopts = "NT"
+  revision = "5f041e8faa004a95c88a202771f4cc3e991971e6"
+  version = "v2.0.1"
 
 [[projects]]
   digest = "1:5cf3f025cbee5951a4ee961de067c8a89fc95a5adabead774f82822efabab121"
@@ -351,6 +377,18 @@
   revision = "fbb02b2291d28baffd63558aa44b4b56f178d650"
 
 [[projects]]
+  branch = "master"
+  digest = "1:45dd82106dea8e3cdfae26488e712a95705565b94fecdf0d87b5a2bf82eb3bcf"
+  name = "golang.org/x/tools"
+  packages = [
+    "go/ast/astutil",
+    "imports",
+    "internal/fastwalk",
+  ]
+  pruneopts = "NT"
+  revision = "90fa682c2a6e6a37b3a1364ce2fe1d5e41af9d6d"
+
+[[projects]]
   digest = "1:2d1fbdc6777e5408cabeb02bf336305e724b925ff4546ded0fa8715a7267922a"
   name = "gopkg.in/inf.v0"
   packages = ["."]
@@ -367,8 +405,8 @@
   version = "v2.2.1"
 
 [[projects]]
-  branch = "release-1.10"
-  digest = "1:6b4ae148679d49dda5e1f7026701662758701b6cbd144cc8db1769710a01c4d2"
+  branch = "release-1.11"
+  digest = "1:374096c8be65a761f4b1039f369cb7b5b09bd3753ec89f92d46f7d1318549423"
   name = "k8s.io/api"
   packages = [
     "admissionregistration/v1alpha1",
@@ -395,17 +433,18 @@
     "rbac/v1alpha1",
     "rbac/v1beta1",
     "scheduling/v1alpha1",
+    "scheduling/v1beta1",
     "settings/v1alpha1",
     "storage/v1",
     "storage/v1alpha1",
     "storage/v1beta1",
   ]
   pruneopts = "NT"
-  revision = "edd5e319fc45211023fffb41c7aa5555229c4179"
+  revision = "4e7be11eab3ffcfc1876898b8272df53785a9504"
 
 [[projects]]
-  branch = "release-1.10"
-  digest = "1:3416303771275b168f3799a0be9a266e8bd1f97d9ceadada58428216a7638f4b"
+  branch = "release-1.11"
+  digest = "1:45e1151aa2826c2a4eee28d8e08fb772551e82d945cb15ebba7eadcb77ade485"
   name = "k8s.io/apimachinery"
   packages = [
     "pkg/api/errors",
@@ -451,11 +490,11 @@
     "third_party/forked/golang/reflect",
   ]
   pruneopts = "NT"
-  revision = "01bc873149a1802eb74df583613872d126449ed5"
+  revision = "def12e63c512da17043b4f0293f52d1006603d9f"
 
 [[projects]]
-  branch = "release-7.0"
-  digest = "1:6c6f76c892b570830b2ed07dc3a3af37b6616e26d002a956a071d87f58f994b0"
+  branch = "release-8.0"
+  digest = "1:14f910908b108d54b2edcb2dd4967b8e354e858b1d65097edb64754fac851ac4"
   name = "k8s.io/client-go"
   packages = [
     "discovery",
@@ -485,12 +524,14 @@
     "kubernetes/typed/rbac/v1alpha1",
     "kubernetes/typed/rbac/v1beta1",
     "kubernetes/typed/scheduling/v1alpha1",
+    "kubernetes/typed/scheduling/v1beta1",
     "kubernetes/typed/settings/v1alpha1",
     "kubernetes/typed/storage/v1",
     "kubernetes/typed/storage/v1alpha1",
     "kubernetes/typed/storage/v1beta1",
     "pkg/apis/clientauthentication",
     "pkg/apis/clientauthentication/v1alpha1",
+    "pkg/apis/clientauthentication/v1beta1",
     "pkg/version",
     "plugin/pkg/client/auth/exec",
     "rest",
@@ -510,6 +551,7 @@
     "transport",
     "util/buffer",
     "util/cert",
+    "util/connrotation",
     "util/flowcontrol",
     "util/homedir",
     "util/integer",
@@ -517,7 +559,34 @@
     "util/workqueue",
   ]
   pruneopts = "NT"
-  revision = "33f2870a2b83179c823ddc90e5513f9e5fe43b38"
+  revision = "f2f85107cac6fe04c30435ca0ac0c3318fd1b94c"
+
+[[projects]]
+  branch = "release-1.11"
+  digest = "1:647030d10eaa615a2739ce4c41db3d6739157d4530aa73fe70a75047d35047fd"
+  name = "k8s.io/code-generator"
+  packages = [
+    "cmd/deepcopy-gen",
+    "cmd/deepcopy-gen/args",
+    "pkg/util",
+  ]
+  pruneopts = "NT"
+  revision = "8c97d6ab64da020f8b151e9d3ed8af3172f5c390"
+
+[[projects]]
+  digest = "1:b57edb99d75c3e08c582a7130d792def58099f092a8a1b55aeec8c689a2fee7c"
+  name = "k8s.io/gengo"
+  packages = [
+    "args",
+    "examples/deepcopy-gen/generators",
+    "examples/set-gen/sets",
+    "generator",
+    "namer",
+    "parser",
+    "types",
+  ]
+  pruneopts = "NT"
+  revision = "01a732e01d00cb9a81bb0ca050d3e6d2b947927b"
 
 [[projects]]
   branch = "master"
@@ -557,6 +626,7 @@
     "k8s.io/client-go/tools/record",
     "k8s.io/client-go/util/flowcontrol",
     "k8s.io/client-go/util/workqueue",
+    "k8s.io/code-generator/cmd/deepcopy-gen",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

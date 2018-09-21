@@ -17,4 +17,14 @@ lint:
 
 .PHONY: test
 test:
-	go test -cover -race ./...
+	go test -race ./...
+
+.PHONY: generate-deepcopy
+generate-deepcopy:
+	go build -o build/bin/deepcopy-gen ./vendor/k8s.io/code-generator/cmd/deepcopy-gen
+	build/bin/deepcopy-gen \
+	--v 1 --logtostderr \
+	--go-header-file "build/boilerplate.go.txt" \
+	--input-dirs "github.com/atlassian/ctrl/apis/condition/v1" \
+	--bounding-dirs "github.com/atlassian/ctrl/apis/condition/v1" \
+	--output-file-base zz_generated.deepcopy
