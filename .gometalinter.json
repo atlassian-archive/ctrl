@@ -6,7 +6,8 @@
     "interfacer"
   ],
   "Exclude": [
-    "comment"
+    "comment",
+    "zz_generated."
   ],
   "Test": true,
   "Vendor": true
