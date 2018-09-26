@@ -35,8 +35,6 @@ type Condition struct {
 	Type ConditionType `json:"type"`
 	// Status of the condition.
 	Status ConditionStatus `json:"status"`
-	// The last time this condition was updated.
-	LastUpdateTime meta_v1.Time `json:"lastUpdateTime,omitempty"`
 	// Last time the condition transitioned from one status to another.
 	LastTransitionTime meta_v1.Time `json:"lastTransitionTime,omitempty"`
 	// The reason for the condition's last transition.
