@@ -10,7 +10,6 @@ import (
 
 	"github.com/ash2k/stager"
 	"github.com/atlassian/ctrl"
-	"github.com/atlassian/ctrl/client"
 	"github.com/atlassian/ctrl/flagutil"
 	"github.com/atlassian/ctrl/logz"
 	"github.com/atlassian/ctrl/process"
@@ -23,7 +22,6 @@ import (
 	core_v1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -41,6 +39,7 @@ type App struct {
 
 	GenericControllerOptions
 	LeaderElectionOptions
+	RestClientOptions
 
 	MainClient         kubernetes.Interface
 	PrometheusRegistry PrometheusRegistry
@@ -159,16 +158,11 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 
 	flagset.BoolVar(&a.Debug, "debug", false, "Enables pprof and prefetcher dump endpoints")
 	flagset.StringVar(&a.AuxListenOn, "aux-listen-on", defaultAuxServerAddr, "Auxiliary address to listen on. Used for Prometheus metrics server and pprof endpoint. Empty to disable")
-	qps := flagset.Float64("api-qps", 5, "Maximum queries per second when talking to Kubernetes API")
 
 	BindLeaderElectionFlags(name, &a.LeaderElectionOptions, flagset)
 	BindGenericControllerFlags(&a.GenericControllerOptions, flagset)
-	configFileFrom := flagset.String("client-config-from", "in-cluster",
-		"Source of REST client configuration. 'in-cluster' (default), 'environment' and 'file' are valid options.")
-	configFileName := flagset.String("client-config-file-name", "",
-		"Load REST client configuration from the specified Kubernetes config file. This is only applicable if --client-config-from=file is set.")
-	configContext := flagset.String("client-config-context", "",
-		"Context to use for REST client configuration. This is only applicable if --client-config-from=file is set.")
+	BindRestClientFlags(&a.RestClientOptions, flagset)
+
 	logEncoding := flagset.String("log-encoding", "json", `Sets the logger's encoding. Valid values are "json" and "console".`)
 	loggingLevel := flagset.String("log-level", "info", `Sets the logger's output level.`)
 
@@ -180,14 +174,11 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 		return nil, err
 	}
 
-	config, err := client.LoadConfig(*configFileFrom, *configFileName, *configContext)
+	var err error
+	a.RestConfig, err = LoadRestClientConfig(name, a.RestClientOptions)
 	if err != nil {
 		return nil, err
 	}
-
-	config.UserAgent = name
-	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(float32(*qps), int(*qps*1.5))
-	a.RestConfig = config
 
 	a.Logger = logz.LoggerStr(*loggingLevel, *logEncoding)
 
