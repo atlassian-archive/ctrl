@@ -2,7 +2,6 @@ package ctrl
 
 import (
 	"context"
-	"flag"
 	"net/http"
 	"time"
 
@@ -15,6 +14,14 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
+
+type FlagSet interface {
+	DurationVar(p *time.Duration, name string, value time.Duration, usage string)
+	IntVar(p *int, name string, value int, usage string)
+	Float64Var(p *float64, name string, value float64, usage string)
+	StringVar(p *string, name string, value string, usage string)
+	BoolVar(p *bool, name string, value bool, usage string)
+}
 
 type Descriptor struct {
 	// Group Version Kind of objects a controller can process.
@@ -33,7 +40,7 @@ type Constructed struct {
 }
 
 type Constructor interface {
-	AddFlags(*flag.FlagSet)
+	AddFlags(FlagSet)
 	// New constructs a new controller and/or server.
 	// If it constructs a controller, it must register an informer for the GVK controller
 	// handles via Context.RegisterInformer().
