@@ -37,7 +37,7 @@ type PrometheusRegistry interface {
 type App struct {
 	Logger *zap.Logger
 
-	GenericControllerOptions
+	GenericNamespacedControllerOptions
 	LeaderElectionOptions
 	RestClientOptions
 	LoggerOptions
@@ -161,7 +161,7 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 	flagset.StringVar(&a.AuxListenOn, "aux-listen-on", defaultAuxServerAddr, "Auxiliary address to listen on. Used for Prometheus metrics server and pprof endpoint. Empty to disable")
 
 	BindLeaderElectionFlags(name, &a.LeaderElectionOptions, flagset)
-	BindGenericControllerFlags(&a.GenericControllerOptions, flagset)
+	BindGenericNamespacedControllerFlags(&a.GenericNamespacedControllerOptions, flagset)
 	BindRestClientFlags(&a.RestClientOptions, flagset)
 	BindLoggerFlags(&a.LoggerOptions, flagset)
 
