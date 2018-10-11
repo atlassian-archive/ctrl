@@ -44,7 +44,7 @@ func NewGeneric(config *ctrl.Config, queue workqueue.RateLimitingInterface, work
 	informers := make(map[schema.GroupVersionKind]cache.SharedIndexInformer)
 	serverHolders := make(map[schema.GroupVersionKind]ServerHolder)
 	wq := workQueue{
-		queue: queue,
+		queue:                   queue,
 		workDeduplicationPeriod: workDeduplicationPeriod,
 	}
 	for _, constr := range constructors {
