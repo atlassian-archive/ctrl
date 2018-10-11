@@ -144,64 +144,64 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 	// Leader election
 	if a.LeaderElectionConfig.LeaderElect {
 		a.Logger.Info("Starting leader election", logz.NamespaceName(a.LeaderElectionConfig.ConfigMapNamespace))
-
-		var startedLeading <-chan struct{}
-		ctx, startedLeading, err = a.startLeaderElection(ctx, a.MainClient.CoreV1(), recorder)
+		ctx, err = DoLeaderElection(ctx, a.Logger, a.Name, a.LeaderElectionConfig, a.MainClient.CoreV1(), recorder)
 		if err != nil {
 			return err
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-startedLeading:
 		}
 	}
 	return generic.Run(ctx)
 }
 
-func (a *App) startLeaderElection(ctx context.Context, configMapsGetter core_v1client.ConfigMapsGetter, recorder record.EventRecorder) (context.Context, <-chan struct{}, error) {
+// DoLeaderElection starts leader election and blocks until it acquires the lease.
+// Returned context is cancelled once the lease is lost or ctx signals done.
+func DoLeaderElection(ctx context.Context, logger *zap.Logger, component string, config LeaderElectionConfig, configMapsGetter core_v1client.ConfigMapsGetter, recorder record.EventRecorder) (context.Context, error) {
 	id, err := os.Hostname()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	ctxRet, cancel := context.WithCancel(ctx)
 	startedLeading := make(chan struct{})
 	le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
 		Lock: &resourcelock.ConfigMapLock{
 			ConfigMapMeta: meta_v1.ObjectMeta{
-				Namespace: a.LeaderElectionConfig.ConfigMapNamespace,
-				Name:      a.LeaderElectionConfig.ConfigMapName,
+				Namespace: config.ConfigMapNamespace,
+				Name:      config.ConfigMapName,
 			},
 			Client: configMapsGetter,
 			LockConfig: resourcelock.ResourceLockConfig{
-				Identity:      id + "-" + a.Name,
+				Identity:      id + "-" + component,
 				EventRecorder: recorder,
 			},
 		},
-		LeaseDuration: a.LeaderElectionConfig.LeaseDuration,
-		RenewDeadline: a.LeaderElectionConfig.RenewDeadline,
-		RetryPeriod:   a.LeaderElectionConfig.RetryPeriod,
+		LeaseDuration: config.LeaseDuration,
+		RenewDeadline: config.RenewDeadline,
+		RetryPeriod:   config.RetryPeriod,
 		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: func(stop <-chan struct{}) {
-				a.Logger.Info("Started leading")
+			OnStartedLeading: func(ctx context.Context) {
+				logger.Info("Started leading")
 				close(startedLeading)
 			},
 			OnStoppedLeading: func() {
-				a.Logger.Info("Leader status lost")
+				logger.Info("Leader status lost")
 				cancel()
 			},
 		},
 	})
 	if err != nil {
 		cancel()
-		return nil, nil, err
+		return nil, err
 	}
 	go func() {
 		// note: because le.Run() also adds a logging panic handler panics with be logged 3 times
 		defer logz.LogStructuredPanic()
-		le.Run()
+		le.Run(ctx)
 	}()
-	return ctxRet, startedLeading, nil
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-startedLeading:
+		return ctxRet, nil
+	}
 }
 
 // CancelOnInterrupt calls f when os.Interrupt or SIGTERM is received.
