@@ -55,8 +55,8 @@ func (q *workQueue) addRateLimited(item gvkQueueKey) {
 
 func (q *workQueue) newQueueForGvk(gvk schema.GroupVersionKind) *gvkQueue {
 	return &gvkQueue{
-		queue: q.queue,
-		gvk:   gvk,
+		queue:                   q.queue,
+		gvk:                     gvk,
 		workDeduplicationPeriod: q.workDeduplicationPeriod,
 	}
 }
