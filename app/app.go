@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/ash2k/stager"
 	"github.com/atlassian/ctrl"
@@ -29,7 +28,6 @@ import (
 )
 
 const (
-	defaultResyncPeriod  = 20 * time.Minute
 	defaultAuxServerAddr = ":9090"
 )
 
@@ -39,21 +37,21 @@ type PrometheusRegistry interface {
 }
 
 type App struct {
-	Logger             *zap.Logger
+	Logger *zap.Logger
+
+	GenericControllerOptions
+	LeaderElectionOptions
+
 	MainClient         kubernetes.Interface
 	PrometheusRegistry PrometheusRegistry
 
 	// Name is the name of the application. It must only contain alphanumeric
 	// characters.
-	Name                  string
-	RestConfig            *rest.Config
-	ResyncPeriod          time.Duration
-	Namespace             string
-	Controllers           []ctrl.Constructor
-	Workers               int
-	LeaderElectionOptions LeaderElectionOptions
-	AuxListenOn           string
-	Debug                 bool
+	Name        string
+	RestConfig  *rest.Config
+	Controllers []ctrl.Constructor
+	AuxListenOn string
+	Debug       bool
 }
 
 func (a *App) Run(ctx context.Context) (retErr error) {
@@ -159,14 +157,12 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 		cntrlr.AddFlags(flagset)
 	}
 
-	flagset.DurationVar(&a.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
-	flagset.IntVar(&a.Workers, "workers", 2, "Number of workers that handle events from informers")
-	flagset.StringVar(&a.Namespace, "namespace", meta_v1.NamespaceAll, "Namespace to use. All namespaces are used if empty string or omitted")
 	flagset.BoolVar(&a.Debug, "debug", false, "Enables pprof and prefetcher dump endpoints")
 	flagset.StringVar(&a.AuxListenOn, "aux-listen-on", defaultAuxServerAddr, "Auxiliary address to listen on. Used for Prometheus metrics server and pprof endpoint. Empty to disable")
 	qps := flagset.Float64("api-qps", 5, "Maximum queries per second when talking to Kubernetes API")
 
 	BindLeaderElectionFlags(name, &a.LeaderElectionOptions, flagset)
+	BindGenericControllerFlags(&a.GenericControllerOptions, flagset)
 	configFileFrom := flagset.String("client-config-from", "in-cluster",
 		"Source of REST client configuration. 'in-cluster' (default), 'environment' and 'file' are valid options.")
 	configFileName := flagset.String("client-config-file-name", "",
