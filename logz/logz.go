@@ -1,8 +1,6 @@
 package logz
 
 import (
-	"os"
-
 	"github.com/atlassian/ctrl"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -65,40 +63,4 @@ func NamespaceName(namespace string) zapcore.Field {
 
 func Iteration(iteration uint32) zapcore.Field {
 	return zap.Uint32("iter", iteration)
-}
-
-func Logger(level zapcore.Level, encoder func(zapcore.EncoderConfig) zapcore.Encoder) *zap.Logger {
-	cfg := zap.NewProductionEncoderConfig()
-	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
-	cfg.TimeKey = "time"
-	lockedSyncer := zapcore.Lock(zapcore.AddSync(os.Stderr))
-	return zap.New(
-		zapcore.NewCore(
-			encoder(cfg),
-			lockedSyncer,
-			level,
-		),
-		zap.ErrorOutput(lockedSyncer),
-	)
-}
-
-func LoggerStr(loggingLevel, logEncoding string) *zap.Logger {
-	var levelEnabler zapcore.Level
-	switch loggingLevel {
-	case "debug":
-		levelEnabler = zap.DebugLevel
-	case "warn":
-		levelEnabler = zap.WarnLevel
-	case "error":
-		levelEnabler = zap.ErrorLevel
-	default:
-		levelEnabler = zap.InfoLevel
-	}
-	var logEncoder func(zapcore.EncoderConfig) zapcore.Encoder
-	if logEncoding == "console" {
-		logEncoder = zapcore.NewConsoleEncoder
-	} else {
-		logEncoder = zapcore.NewJSONEncoder
-	}
-	return Logger(levelEnabler, logEncoder)
 }

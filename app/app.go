@@ -40,6 +40,7 @@ type App struct {
 	GenericControllerOptions
 	LeaderElectionOptions
 	RestClientOptions
+	LoggerOptions
 
 	MainClient         kubernetes.Interface
 	PrometheusRegistry PrometheusRegistry
@@ -162,9 +163,7 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 	BindLeaderElectionFlags(name, &a.LeaderElectionOptions, flagset)
 	BindGenericControllerFlags(&a.GenericControllerOptions, flagset)
 	BindRestClientFlags(&a.RestClientOptions, flagset)
-
-	logEncoding := flagset.String("log-encoding", "json", `Sets the logger's encoding. Valid values are "json" and "console".`)
-	loggingLevel := flagset.String("log-level", "info", `Sets the logger's output level.`)
+	BindLoggerFlags(&a.LoggerOptions, flagset)
 
 	if err := flagutil.ValidateFlags(flagset, arguments); err != nil {
 		return nil, err
@@ -180,7 +179,7 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 		return nil, err
 	}
 
-	a.Logger = logz.LoggerStr(*loggingLevel, *logEncoding)
+	a.Logger = LoggerFromOptions(a.LoggerOptions)
 
 	// Clients
 	a.MainClient, err = kubernetes.NewForConfig(a.RestConfig)
