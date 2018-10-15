@@ -1,18 +1,10 @@
 package app
 
 import (
-	"context"
-	"os"
 	"time"
 
 	"github.com/atlassian/ctrl"
-	"github.com/atlassian/ctrl/logz"
-	"go.uber.org/zap"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	core_v1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/leaderelection"
-	"k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/client-go/tools/record"
 )
 
 const (
@@ -30,58 +22,6 @@ type LeaderElectionOptions struct {
 	RetryPeriod        time.Duration
 	ConfigMapNamespace string
 	ConfigMapName      string
-}
-
-// DoLeaderElection starts leader election and blocks until it acquires the lease.
-// Returned context is cancelled once the lease is lost or ctx signals done.
-func DoLeaderElection(ctx context.Context, logger *zap.Logger, component string, config LeaderElectionOptions, configMapsGetter core_v1client.ConfigMapsGetter, recorder record.EventRecorder) (context.Context, error) {
-	id, err := os.Hostname()
-	if err != nil {
-		return nil, err
-	}
-	ctxRet, cancel := context.WithCancel(ctx)
-	startedLeading := make(chan struct{})
-	le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
-		Lock: &resourcelock.ConfigMapLock{
-			ConfigMapMeta: meta_v1.ObjectMeta{
-				Namespace: config.ConfigMapNamespace,
-				Name:      config.ConfigMapName,
-			},
-			Client: configMapsGetter,
-			LockConfig: resourcelock.ResourceLockConfig{
-				Identity:      id + "-" + component,
-				EventRecorder: recorder,
-			},
-		},
-		LeaseDuration: config.LeaseDuration,
-		RenewDeadline: config.RenewDeadline,
-		RetryPeriod:   config.RetryPeriod,
-		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: func(ctx context.Context) {
-				logger.Info("Started leading")
-				close(startedLeading)
-			},
-			OnStoppedLeading: func() {
-				logger.Info("Leader status lost")
-				cancel()
-			},
-		},
-	})
-	if err != nil {
-		cancel()
-		return nil, err
-	}
-	go func() {
-		// note: because le.Run() also adds a logging panic handler panics with be logged 3 times
-		defer logz.LogStructuredPanic()
-		le.Run(ctx)
-	}()
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-startedLeading:
-		return ctxRet, nil
-	}
 }
 
 func BindLeaderElectionFlags(component string, o *LeaderElectionOptions, fs ctrl.FlagSet) {
