@@ -21,6 +21,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	core_v1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -126,12 +128,64 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 	// Leader election
 	if a.LeaderElectionOptions.LeaderElect {
 		a.Logger.Info("Starting leader election", logz.NamespaceName(a.LeaderElectionOptions.ConfigMapNamespace))
-		ctx, err = DoLeaderElection(ctx, a.Logger, a.Name, a.LeaderElectionOptions, a.MainClient.CoreV1(), recorder)
+
+		var startedLeading <-chan struct{}
+		ctx, startedLeading, err = a.startLeaderElection(ctx, a.MainClient.CoreV1(), recorder)
 		if err != nil {
 			return err
 		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-startedLeading:
+		}
 	}
 	return generic.Run(ctx)
+}
+
+func (a *App) startLeaderElection(ctx context.Context, configMapsGetter core_v1client.ConfigMapsGetter, recorder record.EventRecorder) (context.Context, <-chan struct{}, error) {
+	id, err := os.Hostname()
+	if err != nil {
+		return nil, nil, err
+	}
+	ctxRet, cancel := context.WithCancel(ctx)
+	startedLeading := make(chan struct{})
+	le, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
+		Lock: &resourcelock.ConfigMapLock{
+			ConfigMapMeta: meta_v1.ObjectMeta{
+				Namespace: a.LeaderElectionOptions.ConfigMapNamespace,
+				Name:      a.LeaderElectionOptions.ConfigMapName,
+			},
+			Client: configMapsGetter,
+			LockConfig: resourcelock.ResourceLockConfig{
+				Identity:      id + "-" + a.Name,
+				EventRecorder: recorder,
+			},
+		},
+		LeaseDuration: a.LeaderElectionOptions.LeaseDuration,
+		RenewDeadline: a.LeaderElectionOptions.RenewDeadline,
+		RetryPeriod:   a.LeaderElectionOptions.RetryPeriod,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: func(stop <-chan struct{}) {
+				a.Logger.Info("Started leading")
+				close(startedLeading)
+			},
+			OnStoppedLeading: func() {
+				a.Logger.Info("Leader status lost")
+				cancel()
+			},
+		},
+	})
+	if err != nil {
+		cancel()
+		return nil, nil, err
+	}
+	go func() {
+		// note: because le.Run() also adds a logging panic handler panics with be logged 3 times
+		defer logz.LogStructuredPanic()
+		le.Run()
+	}()
+	return ctxRet, startedLeading, nil
 }
 
 // CancelOnInterrupt calls f when os.Interrupt or SIGTERM is received.
