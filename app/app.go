@@ -12,6 +12,7 @@ import (
 	"github.com/atlassian/ctrl"
 	"github.com/atlassian/ctrl/flagutil"
 	"github.com/atlassian/ctrl/logz"
+	"github.com/atlassian/ctrl/options"
 	"github.com/atlassian/ctrl/process"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -37,10 +38,10 @@ type PrometheusRegistry interface {
 type App struct {
 	Logger *zap.Logger
 
-	GenericNamespacedControllerOptions
-	LeaderElectionOptions
-	RestClientOptions
-	LoggerOptions
+	options.GenericNamespacedControllerOptions
+	options.LeaderElectionOptions
+	options.RestClientOptions
+	options.LoggerOptions
 
 	MainClient         kubernetes.Interface
 	PrometheusRegistry PrometheusRegistry
@@ -126,7 +127,7 @@ func (a *App) Run(ctx context.Context) (retErr error) {
 	// Leader election
 	if a.LeaderElectionOptions.LeaderElect {
 		a.Logger.Info("Starting leader election", logz.NamespaceName(a.LeaderElectionOptions.ConfigMapNamespace))
-		ctx, err = DoLeaderElection(ctx, a.Logger, a.Name, a.LeaderElectionOptions, a.MainClient.CoreV1(), recorder)
+		ctx, err = options.DoLeaderElection(ctx, a.Logger, a.Name, a.LeaderElectionOptions, a.MainClient.CoreV1(), recorder)
 		if err != nil {
 			return err
 		}
@@ -160,10 +161,10 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 	flagset.BoolVar(&a.Debug, "debug", false, "Enables pprof and prefetcher dump endpoints")
 	flagset.StringVar(&a.AuxListenOn, "aux-listen-on", defaultAuxServerAddr, "Auxiliary address to listen on. Used for Prometheus metrics server and pprof endpoint. Empty to disable")
 
-	BindLeaderElectionFlags(name, &a.LeaderElectionOptions, flagset)
-	BindGenericNamespacedControllerFlags(&a.GenericNamespacedControllerOptions, flagset)
-	BindRestClientFlags(&a.RestClientOptions, flagset)
-	BindLoggerFlags(&a.LoggerOptions, flagset)
+	options.BindLeaderElectionFlags(name, &a.LeaderElectionOptions, flagset)
+	options.BindGenericNamespacedControllerFlags(&a.GenericNamespacedControllerOptions, flagset)
+	options.BindRestClientFlags(&a.RestClientOptions, flagset)
+	options.BindLoggerFlags(&a.LoggerOptions, flagset)
 
 	if err := flagutil.ValidateFlags(flagset, arguments); err != nil {
 		return nil, err
@@ -174,12 +175,12 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 	}
 
 	var err error
-	a.RestConfig, err = LoadRestClientConfig(name, a.RestClientOptions)
+	a.RestConfig, err = options.LoadRestClientConfig(name, a.RestClientOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	a.Logger = LoggerFromOptions(a.LoggerOptions)
+	a.Logger = options.LoggerFromOptions(a.LoggerOptions)
 
 	// Clients
 	a.MainClient, err = kubernetes.NewForConfig(a.RestConfig)
