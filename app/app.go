@@ -19,6 +19,7 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/kubernetes"
 	core_v1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
@@ -172,6 +173,12 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 
 	if err := flagset.Parse(arguments); err != nil {
 		return nil, err
+	}
+	if errs := a.GenericNamespacedControllerOptions.DefaultAndValidate(); len(errs) > 0 {
+		return nil, errors.NewAggregate(errs)
+	}
+	if errs := a.RestClientOptions.DefaultAndValidate(); len(errs) > 0 {
+		return nil, errors.NewAggregate(errs)
 	}
 
 	var err error

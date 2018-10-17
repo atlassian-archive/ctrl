@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	defaultResyncPeriod = 20 * time.Minute
+	DefaultResyncPeriod = 20 * time.Minute
+	DefaultWorkers      = 2
 )
 
 type GenericControllerOptions struct {
@@ -16,9 +17,20 @@ type GenericControllerOptions struct {
 	Workers      int
 }
 
+func (o *GenericControllerOptions) DefaultAndValidate() []error {
+	var allErrors []error
+	if o.ResyncPeriod == 0 {
+		o.ResyncPeriod = DefaultResyncPeriod
+	}
+	if o.Workers == 0 {
+		o.Workers = DefaultWorkers
+	}
+	return allErrors
+}
+
 func BindGenericControllerFlags(o *GenericControllerOptions, fs ctrl.FlagSet) {
-	fs.DurationVar(&o.ResyncPeriod, "resync-period", defaultResyncPeriod, "Resync period for informers")
-	fs.IntVar(&o.Workers, "workers", 2, "Number of workers that handle events from informers")
+	fs.DurationVar(&o.ResyncPeriod, "resync-period", DefaultResyncPeriod, "Resync period for informers")
+	fs.IntVar(&o.Workers, "workers", DefaultWorkers, "Number of workers that handle events from informers")
 }
 
 type GenericNamespacedControllerOptions struct {
