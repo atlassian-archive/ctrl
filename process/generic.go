@@ -31,13 +31,13 @@ type Generic struct {
 	iter        uint32
 	logger      *zap.Logger
 	queue       workQueue
-	workers     int
+	workers     uint
 	Controllers map[schema.GroupVersionKind]Holder
 	Servers     map[schema.GroupVersionKind]ServerHolder
 	Informers   map[schema.GroupVersionKind]cache.SharedIndexInformer
 }
 
-func NewGeneric(config *ctrl.Config, queue workqueue.RateLimitingInterface, workers int, constructors ...ctrl.Constructor) (*Generic, error) {
+func NewGeneric(config *ctrl.Config, queue workqueue.RateLimitingInterface, workers uint, constructors ...ctrl.Constructor) (*Generic, error) {
 	controllers := make(map[schema.GroupVersionKind]ctrl.Interface)
 	servers := make(map[schema.GroupVersionKind]ctrl.Server)
 	holders := make(map[schema.GroupVersionKind]Holder)
@@ -209,7 +209,7 @@ func (g *Generic) Run(ctx context.Context) error {
 
 	// Stage: start workers
 	stage = stgr.NextStage()
-	for i := 0; i < g.workers; i++ {
+	for i := uint(0); i < g.workers; i++ {
 		stage.Start(func() {
 			defer logz.LogStructuredPanic()
 			g.worker()

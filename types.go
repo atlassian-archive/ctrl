@@ -21,6 +21,9 @@ type FlagSet interface {
 	Float64Var(p *float64, name string, value float64, usage string)
 	StringVar(p *string, name string, value string, usage string)
 	BoolVar(p *bool, name string, value bool, usage string)
+	UintVar(p *uint, name string, value uint, usage string)
+	Int64Var(p *int64, name string, value int64, usage string)
+	Uint64Var(p *uint64, name string, value uint64, usage string)
 }
 
 type Descriptor struct {
