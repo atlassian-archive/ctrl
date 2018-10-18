@@ -1,4 +1,4 @@
-package app
+package options
 
 import (
 	"github.com/atlassian/ctrl"
@@ -9,6 +9,11 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 )
 
+const (
+	DefaultAPIQPS     = 5
+	APIQPSBurstFactor = 1.5
+)
+
 type RestClientOptions struct {
 	APIQPS               float64
 	ClientConfigFileFrom string
@@ -16,8 +21,19 @@ type RestClientOptions struct {
 	ClientContext        string
 }
 
+func (o *RestClientOptions) DefaultAndValidate() []error {
+	var allErrors []error
+	if o.APIQPS == 0 {
+		o.APIQPS = DefaultAPIQPS
+	}
+	if o.APIQPS < 0 {
+		allErrors = append(allErrors, errors.Errorf("value for API QPS must be non-negative. Given: %f", o.APIQPS))
+	}
+	return allErrors
+}
+
 func BindRestClientFlags(o *RestClientOptions, fs ctrl.FlagSet) {
-	fs.Float64Var(&o.APIQPS, "api-qps", 5, "Maximum queries per second when talking to Kubernetes API")
+	fs.Float64Var(&o.APIQPS, "api-qps", DefaultAPIQPS, "Maximum queries per second when talking to Kubernetes API")
 	fs.StringVar(&o.ClientConfigFileFrom, "client-config-from", "in-cluster",
 		"Source of REST client configuration. 'in-cluster' (default) and 'file' are valid options.")
 	fs.StringVar(&o.ClientConfigFileName, "client-config-file-name", "",
@@ -48,7 +64,7 @@ func LoadRestClientConfig(userAgent string, options RestClientOptions) (*rest.Co
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to load REST client configuration from %q", options.ClientConfigFileFrom)
 	}
-	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(float32(options.APIQPS), int(options.APIQPS*1.5))
+	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(float32(options.APIQPS), int(options.APIQPS*APIQPSBurstFactor))
 	config.UserAgent = userAgent
 	return config, nil
 }
