@@ -50,6 +50,8 @@ func (g *Generic) processNextWorkItem() bool {
 }
 
 func (g *Generic) handleErr(logger *zap.Logger, holder Holder, retriable bool, err error, key gvkQueueKey) {
+	groupKind := key.gvk.GroupKind()
+
 	if err == nil {
 		g.queue.forget(key)
 		return
