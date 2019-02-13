@@ -54,13 +54,17 @@ func (g *Generic) handleErr(logger *zap.Logger, retriable bool, err error, key g
 		g.queue.forget(key)
 		return
 	}
-	if retriable && g.queue.numRequeues(key) < maxRetries {
-		logger.Info("Error syncing object", zap.Error(err))
+	if retriable {
+		if g.queue.numRequeues(key) >= maxRetries {
+			logger.Warn("Exceeded maximum retries, dropping object out of the queue", zap.Error(err))
+			return
+		}
+		logger.Info("Error syncing object, will retry", zap.Error(err))
 		g.queue.addRateLimited(key)
 		return
 	}
 
-	logger.Info("Dropping object out of the queue", zap.Error(err))
+	logger.Error("Dropping object out of the queue", zap.Error(err))
 	g.queue.forget(key)
 }
 
