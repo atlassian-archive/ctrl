@@ -70,10 +70,10 @@ func (g *Generic) handleErr(logger *zap.Logger, holder Holder, external bool, re
 		WithLabelValues(holder.AppName, key.Namespace, key.Name, groupKind.String(), strconv.FormatBool(external), strconv.FormatBool(false)).
 		Inc()
 
-	if !external {
-		logger.Error("Dropping object out of the queue due to internal error", zap.Error(err))
-	} else {
+	if external {
 		logger.Info("Dropping object out of the queue due to external error", zap.Error(err))
+	} else {
+		logger.Error("Dropping object out of the queue due to internal error", zap.Error(err))
 	}
 	g.queue.forget(key)
 }

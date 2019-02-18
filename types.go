@@ -55,8 +55,7 @@ type Interface interface {
 	Run(context.Context)
 
 	// Process is implemented by the controller and returns:
-	// - true for externalErr if the error is not an internal error and should
-	//   not be logged at error level
+	// - true for externalErr if the error is not an internal error
 	// - true for retriableErr if the error is a retriable error (i.e. should be
 	//   added back to the work queue). These are retried for limited number of
 	//   attempts
