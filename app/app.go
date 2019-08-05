@@ -197,7 +197,7 @@ func NewFromFlags(name string, controllers []ctrl.Constructor, flagset *flag.Fla
 
 	// Metrics
 	a.PrometheusRegistry = prometheus.NewPedanticRegistry()
-	err = a.PrometheusRegistry.Register(prometheus.NewProcessCollector(os.Getpid(), ""))
+	err = a.PrometheusRegistry.Register(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
 	if err != nil {
 		return nil, err
 	}

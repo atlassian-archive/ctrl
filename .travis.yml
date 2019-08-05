@@ -1,19 +1,18 @@
-dist: trusty
+dist: bionic
 sudo: false
 language: go
 
-cache:
-  directories:
-    - $GOPATH/pkg/dep
-
 go:
-  - "1.x"
+  - "1.12.7"
 
 os:
   - linux
 
+env:
+  global:
+    - GO111MODULE=on
+
 install:
-  - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
   - make setup
 
 script:
