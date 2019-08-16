@@ -2,16 +2,10 @@ ALL_GO_FILES=$$(find . -type f -name '*.go' -not -path "./vendor/*")
 KUBE="kubernetes-1.15.1"
 CLIENT="v12.0.0"
 
-.PHONY: setup
-setup:
-
 .PHONY: fmt
 fmt:
 	go build -o build/bin/goimports golang.org/x/tools/cmd/goimports
 	build/bin/goimports -w=true -d $(ALL_GO_FILES)
-
-.PHONY: lint
-lint:
 
 .PHONY: test
 test:
