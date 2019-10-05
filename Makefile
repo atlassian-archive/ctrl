@@ -1,6 +1,5 @@
 ALL_GO_FILES=$$(find . -type f -name '*.go' -not -path "./vendor/*")
-KUBE="kubernetes-1.15.1"
-CLIENT="v12.0.0"
+KUBE="kubernetes-1.16.1"
 
 .PHONY: fmt
 fmt:
@@ -20,7 +19,7 @@ update-kube:
 	go get \
 		k8s.io/api/core/v1@$(KUBE) \
 		k8s.io/apimachinery@$(KUBE) \
-		k8s.io/client-go@$(CLIENT) \
+		k8s.io/client-go@$(KUBE) \
 		k8s.io/code-generator/cmd/deepcopy-gen@$(KUBE) \
 		github.com/stretchr/testify@v1.3.0
 	go mod tidy
